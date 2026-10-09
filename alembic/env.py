@@ -5,15 +5,21 @@ from sqlalchemy import engine_from_config, pool
 
 from app.core.config import get_settings
 from app.db.base import Base
+from app import models as _models  # noqa: F401
 
 config = context.config
 
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
-settings = get_settings()
-escaped_url = settings.sqlalchemy_database_uri.replace("%", "%%")
-config.set_main_option("sqlalchemy.url", escaped_url)
+def _sqlalchemy_url() -> str:
+    configured = config.get_main_option("sqlalchemy.url")
+    if configured and not configured.startswith("driver://"):
+        return configured
+    return get_settings().sqlalchemy_database_uri.replace("%", "%%")
+
+
+config.set_main_option("sqlalchemy.url", _sqlalchemy_url())
 
 target_metadata = Base.metadata
 

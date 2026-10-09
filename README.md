@@ -4,7 +4,7 @@ Backend-first CRM for a single retail printing shop. Frontend development starts
 
 ## Current phase
 
-Phase 1 — Docker/backend foundation.
+Phase 2 — Schema and migrations.
 
 ## Prerequisites
 
@@ -37,9 +37,10 @@ docker compose logs -f postgres
 
 ## Migrations
 
-Alembic is configured. Schema migrations are added in Phase 2. Check current revision:
+Apply schema migrations (does not reset data):
 
 ```bash
+docker compose exec api alembic upgrade head
 docker compose exec api alembic current
 ```
 

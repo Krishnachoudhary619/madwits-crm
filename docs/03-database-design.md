@@ -213,3 +213,33 @@ Ask for clarification if not specified elsewhere:
 - Overpayment/refund/void policy.
 - Exact rules when a workflow stage is deactivated while jobs reference it.
 - Whether jobs can be reopened after `LOST`, `CANCELLED` or `CONFIRMED`.
+
+## 16. Phase 2 implementation notes
+
+These notes record how the approved schema is enforced. They do not change business rules.
+
+### Database-level enforcement
+
+- Foreign keys use `ON DELETE RESTRICT` so users, categories, stages, jobs, payments and history cannot be removed in a way that silently destroys related records.
+- Payments and job status history are not cascade-deleted.
+- Active print category names are unique (`uq_print_categories_active_name`).
+- Active stage names are unique per category.
+- Stage sequence is unique per category. The constraint is deferrable so reordering can be done in one transaction without collisions.
+- At most one active initial stage and one active final stage per category are enforced with partial unique indexes.
+- A job's `current_stage_id`, when set, must belong to the job's `category_id` via composite foreign key `fk_jobs_current_stage_same_category`.
+- Check constraints enforce user roles, lead statuses, positive quantity/sequence/payment amount, and non-negative money columns.
+- `password_hash` is `VARCHAR(255)`.
+- Payment methods are stored as `VARCHAR(40)` rather than a closed database enum, so additional configured methods do not require a schema change.
+
+### Service-layer enforcement (later phases)
+
+The following cannot be fully enforced by this schema and must be validated by the service layer:
+
+- Each active workflow must have **exactly** one active initial stage and one active final stage (the database enforces at most one).
+- The selected attribution user must exist and be **active** at the time of a stage change. History keeps the user ID if that user is later deactivated.
+- Job stage updates and history inserts must commit or roll back together.
+- Attribution identity must not be used for authorization.
+- Allowed inquiry lifecycle transitions.
+- Job-number generation without `MAX(job_number) + 1`.
+- Concurrent stage updates (expected current stage or equivalent). A version column was not added because it is not in the approved schema.
+- Payment-method allow-list, overpayment/refund policy, and idempotency.
