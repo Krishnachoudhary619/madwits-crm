@@ -193,7 +193,7 @@ export function CustomerPicker({
 
   return (
     <div ref={rootRef} className="relative">
-      <span className="mb-1.5 block text-sm font-medium text-charcoal">Customer</span>
+      <span className="mb-1.5 block label-text text-charcoal">Customer</span>
       <input type="hidden" name="customer_id" value={value} required />
       <div className="relative">
         <input
@@ -203,7 +203,7 @@ export function CustomerPicker({
           aria-controls={listId}
           aria-autocomplete="list"
           autoComplete="off"
-          className="w-full rounded-md border border-line bg-white px-3 py-2 pr-10 text-sm text-charcoal placeholder:text-muted focus:border-charcoal focus:outline-none focus:ring-2 focus:ring-amber/60"
+          className="min-h-11 w-full rounded-md border border-line bg-white px-3 py-2 pr-10 text-sm text-charcoal placeholder:text-muted focus:border-charcoal focus:outline-none focus:ring-2 focus:ring-amber/60"
           placeholder="Search name or phone"
           value={display}
           onFocus={() => {
@@ -219,7 +219,7 @@ export function CustomerPicker({
         />
         <button
           type="button"
-          className="absolute inset-y-0 right-0 flex items-center px-2 text-muted"
+          className="absolute inset-y-0 right-0 flex min-w-11 items-center justify-center text-muted"
           aria-label="Show customers"
           onClick={() => {
             setOpen((current) => !current);

@@ -116,7 +116,38 @@ export default function StaffPage() {
         <Spinner />
       ) : (
         <Card>
-          <div className="overflow-x-auto">
+          <div className="space-y-2 p-3 md:hidden">
+            {items.map((row) => (
+              <div key={row.id} className="rounded-xl border border-line p-3.5">
+                <div className="flex items-start justify-between gap-2">
+                  <div>
+                    <p className="font-medium">{row.display_name}</p>
+                    <p className="meta-text">
+                      {row.username} · {row.role}
+                    </p>
+                  </div>
+                  <ActiveBadge active={row.is_active} />
+                </div>
+                <p className="mt-1 meta-text">Created {formatDate(row.created_at)}</p>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <Button
+                    variant="secondary"
+                    onClick={() => {
+                      setEditing(row);
+                      setDisplayName(row.display_name);
+                      setPassword("");
+                    }}
+                  >
+                    Edit
+                  </Button>
+                  <Button variant="secondary" disabled={busy} onClick={() => void toggle(row)}>
+                    {row.is_active ? "Deactivate" : "Activate"}
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
+          <div className="hidden overflow-x-auto md:block">
             <table className="table-grid">
               <thead>
                 <tr>

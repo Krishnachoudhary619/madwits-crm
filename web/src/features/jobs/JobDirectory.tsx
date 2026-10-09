@@ -9,7 +9,20 @@ import { errorMessage } from "@/lib/errors";
 import { formatInr } from "@/lib/money";
 import { LEAD_LABELS, OPEN_ENQUIRY_STATUSES } from "@/lib/lifecycle";
 import type { Job, LeadStatus } from "@/types/api";
-import { Button, Card, EmptyState, ErrorBanner, Input, PageHeader, Pagination, Select, Spinner } from "@/components/ui";
+import {
+  Button,
+  Card,
+  EmptyState,
+  ErrorBanner,
+  FilterPanel,
+  Input,
+  PageHeader,
+  Pagination,
+  RecordCard,
+  ResponsiveRecords,
+  Select,
+  Spinner,
+} from "@/components/ui";
 import { LeadBadge } from "@/components/StatusBadge";
 import { useCatalogs, nameById } from "@/hooks/useCatalogs";
 import { JobForm } from "@/features/jobs/JobForm";
@@ -111,8 +124,8 @@ export function JobDirectory({
           </Button>
         }
       />
-      <Card className="mb-4 p-4">
-        <div className="grid gap-3 md:grid-cols-3 xl:grid-cols-6">
+      <FilterPanel>
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
           <Input
             placeholder="Search job number, title, customer"
             value={q}
@@ -186,7 +199,7 @@ export function JobDirectory({
           />
         </div>
         {customerId ? (
-          <p className="mt-3 text-sm text-muted">
+          <p className="mt-3 body-text text-muted">
             Showing jobs for one customer.{" "}
             <button type="button" className="underline" onClick={() => { setPage(1); setCustomerId(""); }}>
               Clear customer filter
@@ -194,9 +207,10 @@ export function JobDirectory({
           </p>
         ) : null}
         {mode === "jobs" ? (
-          <label className="mt-3 flex items-center gap-2 text-sm text-charcoal">
+          <label className="mt-3 flex min-h-11 items-center gap-2 body-text text-charcoal">
             <input
               type="checkbox"
+              className="h-4 w-4"
               checked={overdue}
               onChange={(event) => {
                 setPage(1);
@@ -206,7 +220,7 @@ export function JobDirectory({
             Follow-up overdue
           </label>
         ) : null}
-      </Card>
+      </FilterPanel>
       {error ? <ErrorBanner message={error} /> : null}
       {loading ? (
         <Spinner />
@@ -218,38 +232,58 @@ export function JobDirectory({
         />
       ) : (
         <Card>
-          <div className="overflow-x-auto">
-            <table className="table-grid">
-              <thead>
-                <tr>
-                  <th>Job</th>
-                  <th>Customer</th>
-                  <th>Category</th>
-                  <th>Status</th>
-                  <th>Amount</th>
-                  <th>Due</th>
-                </tr>
-              </thead>
-              <tbody>
-                {items.map((job) => (
-                  <tr key={job.id}>
-                    <td>
-                      <Link className="font-medium hover:underline" href={`/jobs/${job.id}`}>
-                        {job.job_number}
-                      </Link>
-                      <div className="text-xs text-muted">{job.title}</div>
-                    </td>
-                    <td>{nameById(customers, job.customer_id)}</td>
-                    <td>{nameById(categories, job.category_id)}</td>
-                    <td>
-                      <LeadBadge status={job.lead_status} />
-                    </td>
-                    <td>{formatInr(job.final_amount ?? job.quoted_amount)}</td>
-                    <td>{formatDate(job.due_date)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <div className="p-3 md:p-0">
+            <ResponsiveRecords
+              cards={items.map((job) => (
+                <RecordCard
+                  key={job.id}
+                  href={`/jobs/${job.id}`}
+                  title={job.job_number}
+                  subtitle={`${nameById(customers, job.customer_id)} · ${nameById(categories, job.category_id)}`}
+                  extra={<LeadBadge status={job.lead_status} />}
+                  meta={
+                    <>
+                      <span className="money">{formatInr(job.final_amount ?? job.quoted_amount)}</span>
+                      <span>Due {formatDate(job.due_date)}</span>
+                      {job.title ? <span className="truncate">{job.title}</span> : null}
+                    </>
+                  }
+                />
+              ))}
+              table={
+                <table className="table-grid">
+                  <thead>
+                    <tr>
+                      <th>Job</th>
+                      <th>Customer</th>
+                      <th>Category</th>
+                      <th>Status</th>
+                      <th>Amount</th>
+                      <th>Due</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {items.map((job) => (
+                      <tr key={job.id}>
+                        <td>
+                          <Link className="font-medium hover:underline" href={`/jobs/${job.id}`}>
+                            {job.job_number}
+                          </Link>
+                          <div className="meta-text">{job.title}</div>
+                        </td>
+                        <td>{nameById(customers, job.customer_id)}</td>
+                        <td>{nameById(categories, job.category_id)}</td>
+                        <td>
+                          <LeadBadge status={job.lead_status} />
+                        </td>
+                        <td className="money">{formatInr(job.final_amount ?? job.quoted_amount)}</td>
+                        <td>{formatDate(job.due_date)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              }
+            />
           </div>
           <Pagination page={page} pageSize={20} total={total} onPage={setPage} />
         </Card>

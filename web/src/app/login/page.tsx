@@ -19,6 +19,7 @@ function LoginForm() {
 
   async function onSubmit(event: FormEvent) {
     event.preventDefault();
+    if (busy) return;
     setBusy(true);
     setError("");
     try {
@@ -33,11 +34,11 @@ function LoginForm() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-canvas px-4">
-      <div className="w-full max-w-md rounded-2xl border border-line bg-white p-8 shadow-sm">
+    <div className="flex min-h-screen items-center justify-center bg-canvas px-4 py-8">
+      <div className="w-full max-w-md rounded-2xl border border-line bg-white p-6 shadow-[var(--shadow-card)] sm:p-8">
         <BrandMark />
-        <h1 className="mt-6 text-2xl font-semibold text-charcoal">Sign in</h1>
-        <p className="mt-1 text-sm text-muted">
+        <h1 className="page-title mt-6 text-charcoal">Sign in</h1>
+        <p className="mt-1 body-text text-muted">
           Use the shop Staff session for daily work, or Admin for staff management.
         </p>
         <form className="mt-6 space-y-4" onSubmit={onSubmit}>

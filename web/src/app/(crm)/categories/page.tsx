@@ -194,8 +194,8 @@ export default function CategoriesPage() {
                 <li key={category.id}>
                   <button
                     type="button"
-                    className={`flex w-full items-center justify-between px-4 py-3 text-left text-sm ${
-                      selected?.id === category.id ? "bg-canvas" : ""
+                    className={`flex min-h-11 w-full items-center justify-between gap-2 px-4 py-3 text-left text-sm ${
+                      selected?.id === category.id ? "border-l-4 border-amber bg-canvas" : "border-l-4 border-transparent"
                     }`}
                     onClick={() => void selectCategory(category)}
                   >
@@ -210,8 +210,8 @@ export default function CategoriesPage() {
             <Card className="p-4 lg:col-span-2">
               <div className="flex flex-wrap items-start justify-between gap-2">
                 <div>
-                  <h2 className="text-lg font-medium">{selected.name}</h2>
-                  <p className="text-sm text-muted">{selected.description || "No description"}</p>
+                  <h2 className="section-title text-charcoal">{selected.name}</h2>
+                  {selected.description ? <p className="body-text text-muted">{selected.description}</p> : null}
                 </div>
                 <div className="flex gap-2">
                   <Button
@@ -230,7 +230,7 @@ export default function CategoriesPage() {
                 </div>
               </div>
               <div className="mt-6 flex items-center justify-between">
-                <h3 className="font-medium">Workflow stages</h3>
+                <h3 className="card-title">Workflow stages</h3>
                 <Button onClick={() => setAddingStage(true)}>Add stage</Button>
               </div>
               <ol className="mt-3 space-y-2">

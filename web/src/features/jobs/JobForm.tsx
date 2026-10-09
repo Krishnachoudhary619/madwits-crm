@@ -136,7 +136,7 @@ export function JobForm({
       <Field label="Specifications" hint="Free-text job specs stored on the job. JSON is accepted if valid.">
         <Textarea value={specs} onChange={(event) => setSpecs(event.target.value)} />
       </Field>
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <Field label="Due date">
           <Input type="date" value={dueDate} onChange={(event) => setDueDate(event.target.value)} />
         </Field>

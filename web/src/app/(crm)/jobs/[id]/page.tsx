@@ -25,6 +25,15 @@ import { JobForm } from "@/features/jobs/JobForm";
 import { JobActions, PaymentModal } from "@/features/jobs/JobActions";
 import { useToast } from "@/components/Toast";
 
+function Detail({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <dt className="meta-text">{label}</dt>
+      <dd className="mt-0.5 body-text font-medium text-charcoal">{children}</dd>
+    </div>
+  );
+}
+
 export default function JobDetailPage() {
   const { id } = useParams<{ id: string }>();
   const toast = useToast();
@@ -84,12 +93,23 @@ export default function JobDetailPage() {
     stages.find((stage) => stage.id === stageId)?.name ?? (stageId ? "Unknown stage" : "—");
   const userName = (userId: string) =>
     users.find((user) => user.id === userId)?.display_name ?? userId;
+  const specs = specText(job.specifications);
+  const hasDetails = Boolean(job.description || specs || job.notes);
 
   return (
     <div>
       <PageHeader
         title={job.job_number}
-        description={job.title}
+        description={job.title || category?.name}
+        breadcrumb={
+          <>
+            <Link href="/jobs" className="hover:underline">
+              Jobs
+            </Link>
+            {" / "}
+            {job.job_number}
+          </>
+        }
         actions={
           <>
             <Button variant="secondary" onClick={() => setEditing(true)}>
@@ -101,13 +121,6 @@ export default function JobDetailPage() {
           </>
         }
       />
-      <p className="mb-4 text-sm text-muted">
-        <Link href="/jobs" className="hover:underline">
-          Jobs
-        </Link>
-        {" / "}
-        {job.job_number}
-      </p>
       {conflict ? (
         <div className="mb-4">
           <ErrorBanner message={conflict} />
@@ -118,7 +131,7 @@ export default function JobDetailPage() {
       ) : null}
       {error ? <ErrorBanner message={error} /> : null}
 
-      <div className="mb-4">
+      <div className="mb-5">
         <JobActions
           job={job}
           stages={stages}
@@ -134,114 +147,122 @@ export default function JobDetailPage() {
         />
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-3">
-        <Card className="p-4 lg:col-span-2">
-          <h2 className="mb-3 font-medium">Overview</h2>
-          <dl className="grid gap-3 sm:grid-cols-2 text-sm">
-            <div>
-              <dt className="text-muted">Customer</dt>
-              <dd>
-                <Link className="hover:underline" href={`/customers/${job.customer_id}`}>
-                  {customer?.name}
-                </Link>
-                <div className="text-muted">{customer?.phone}</div>
-              </dd>
-            </div>
-            <div>
-              <dt className="text-muted">Print category</dt>
-              <dd>{category?.name}</dd>
-            </div>
-            <div>
-              <dt className="text-muted">Lifecycle</dt>
-              <dd>
-                <LeadBadge status={job.lead_status} />
-              </dd>
-            </div>
-            <div>
-              <dt className="text-muted">Quantity</dt>
-              <dd>{job.quantity}</dd>
-            </div>
-            <div>
-              <dt className="text-muted">Quoted</dt>
-              <dd>{formatInr(job.quoted_amount)}</dd>
-            </div>
-            <div>
-              <dt className="text-muted">Final amount</dt>
-              <dd>{formatInr(job.final_amount)}</dd>
-            </div>
-            <div>
-              <dt className="text-muted">Due date</dt>
-              <dd>{formatDate(job.due_date)}</dd>
-            </div>
-            <div>
-              <dt className="text-muted">Follow-up</dt>
-              <dd>{formatDateTime(job.next_follow_up_at)}</dd>
-            </div>
-            <div className="sm:col-span-2">
-              <dt className="text-muted">Description</dt>
-              <dd className="whitespace-pre-wrap">{job.description}</dd>
-            </div>
-            <div className="sm:col-span-2">
-              <dt className="text-muted">Specifications</dt>
-              <dd className="whitespace-pre-wrap">{specText(job.specifications) || "—"}</dd>
-            </div>
-            <div className="sm:col-span-2">
-              <dt className="text-muted">Notes</dt>
-              <dd className="whitespace-pre-wrap">{job.notes || "—"}</dd>
-            </div>
+      <div className="grid items-start gap-4 lg:grid-cols-3">
+        <Card className="p-4 sm:p-5 lg:col-span-2">
+          <h2 className="section-title mb-4 text-charcoal">Overview</h2>
+          <dl className="grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-3">
+            <Detail label="Customer">
+              <Link className="hover:underline" href={`/customers/${job.customer_id}`}>
+                {customer?.name}
+              </Link>
+              {customer?.phone ? <div className="font-normal text-muted">{customer.phone}</div> : null}
+            </Detail>
+            <Detail label="Print category">{category?.name}</Detail>
+            <Detail label="Lifecycle">
+              <LeadBadge status={job.lead_status} />
+            </Detail>
+            <Detail label="Quantity">{job.quantity}</Detail>
+            <Detail label="Quoted">
+              <span className="money">{formatInr(job.quoted_amount)}</span>
+            </Detail>
+            <Detail label="Final amount">
+              <span className="money">{formatInr(job.final_amount)}</span>
+            </Detail>
+            <Detail label="Due date">{formatDate(job.due_date)}</Detail>
+            <Detail label="Follow-up">{formatDateTime(job.next_follow_up_at)}</Detail>
           </dl>
+          {hasDetails ? (
+            <div className="mt-5 space-y-3 border-t border-line pt-4">
+              {job.description ? (
+                <div>
+                  <h3 className="label-text text-muted">Description</h3>
+                  <p className="mt-1 whitespace-pre-wrap body-text">{job.description}</p>
+                </div>
+              ) : null}
+              {specs ? (
+                <div>
+                  <h3 className="label-text text-muted">Specifications</h3>
+                  <p className="mt-1 whitespace-pre-wrap body-text">{specs}</p>
+                </div>
+              ) : null}
+              {job.notes ? (
+                <div>
+                  <h3 className="label-text text-muted">Notes</h3>
+                  <p className="mt-1 whitespace-pre-wrap body-text">{job.notes}</p>
+                </div>
+              ) : null}
+            </div>
+          ) : null}
         </Card>
-        <Card className="p-4">
-          <h2 className="mb-3 font-medium">Payments</h2>
+
+        <Card className="p-4 sm:p-5">
+          <div className="flex items-start justify-between gap-2">
+            <h2 className="section-title text-charcoal">Payments</h2>
+            {balance ? <PaymentBadge status={balance.payment_status} /> : null}
+          </div>
           {balance ? (
-            <>
-              <p className="text-sm">Due {formatInr(balance.amount_due)}</p>
-              <p className="text-sm">Paid {formatInr(balance.total_paid)}</p>
-              <p className="text-lg font-semibold">Outstanding {formatInr(balance.balance)}</p>
-              <div className="mt-2">
-                <PaymentBadge status={balance.payment_status} />
+            <dl className="mt-3 space-y-2">
+              <div className="flex justify-between body-text">
+                <dt className="text-muted">Amount due</dt>
+                <dd className="money">{formatInr(balance.amount_due)}</dd>
               </div>
-            </>
+              <div className="flex justify-between body-text">
+                <dt className="text-muted">Paid</dt>
+                <dd className="money">{formatInr(balance.total_paid)}</dd>
+              </div>
+              <div className="flex justify-between border-t border-line pt-2">
+                <dt className="label-text">Outstanding</dt>
+                <dd className="money text-lg font-semibold">{formatInr(balance.balance)}</dd>
+              </div>
+            </dl>
           ) : (
-            <p className="text-sm text-muted">
-              Payment balances are available after the job is confirmed.
-            </p>
+            <p className="mt-2 body-text text-muted">Payment balances are available after the job is confirmed.</p>
           )}
-          <ul className="mt-4 space-y-2 text-sm">
-            {payments.map((payment) => (
-              <li key={payment.id} className="flex justify-between gap-2 border-b border-line pb-2">
-                <span>
-                  {formatDateTime(payment.paid_at)} · {payment.payment_method}
-                  {payment.reference_number ? ` · ${payment.reference_number}` : ""}
-                </span>
-                <span>{formatInr(payment.amount)}</span>
-              </li>
-            ))}
-          </ul>
+          {canRecordPayment(job.lead_status) && balance?.payment_status !== "PAID" ? (
+            <Button className="mt-4 w-full" onClick={() => setPaying(true)}>
+              Record payment
+            </Button>
+          ) : null}
+          {payments.length > 0 ? (
+            <ul className="mt-4 space-y-2 border-t border-line pt-3">
+              {payments.map((payment) => (
+                <li key={payment.id} className="flex justify-between gap-3 body-text">
+                  <span className="min-w-0">
+                    <span className="block">{payment.payment_method}</span>
+                    <span className="meta-text">
+                      {formatDateTime(payment.paid_at)}
+                      {payment.reference_number ? ` · ${payment.reference_number}` : ""}
+                    </span>
+                  </span>
+                  <span className="money shrink-0 font-medium">{formatInr(payment.amount)}</span>
+                </li>
+              ))}
+            </ul>
+          ) : null}
         </Card>
       </div>
 
-      <Card className="mt-4 p-4">
-        <h2 className="mb-3 font-medium">Production</h2>
-        <p className="text-sm">
+      <Card className="mt-4 p-4 sm:p-5">
+        <h2 className="section-title text-charcoal">Production</h2>
+        <p className="mt-2 body-text">
           Current stage: <strong>{stageName(job.current_stage_id)}</strong>
         </p>
-        <p className="mt-1 text-xs text-muted">
+        <p className="mt-1 meta-text">
           Workflow: {stages.filter((stage) => stage.is_active).map((stage) => stage.name).join(" → ") || "None configured"}
         </p>
-        <ol className="mt-4 space-y-2 text-sm">
+        <ol className="mt-4 space-y-3">
           {history.map((entry) => (
             <li key={entry.id} className="border-l-2 border-amber pl-3">
-              <div>
+              <div className="body-text font-medium">
                 {entry.from_stage_id ? stageName(entry.from_stage_id) : "—"} → {stageName(entry.to_stage_id)}
               </div>
-              <div className="text-xs text-muted">
+              <div className="meta-text">
                 {formatDateTime(entry.created_at)} · {userName(entry.updated_by_user_id)}
-                {entry.notes ? ` · ${entry.notes}` : ""}
               </div>
+              {entry.notes ? <p className="mt-0.5 body-text text-muted">{entry.notes}</p> : null}
             </li>
           ))}
-          {history.length === 0 ? <li className="text-muted">No production history yet.</li> : null}
+          {history.length === 0 ? <li className="body-text text-muted">No production history yet.</li> : null}
         </ol>
       </Card>
 

@@ -19,12 +19,12 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   return (
     <ToastContext.Provider value={value}>
       {children}
-      <div className="pointer-events-none fixed right-4 top-4 z-[60] flex w-80 flex-col gap-2">
+      <div className="pointer-events-none fixed inset-x-4 top-3 z-[80] flex flex-col gap-2 sm:inset-x-auto sm:right-4 sm:top-4 sm:w-80">
         {items.map((item) => (
           <div
             key={item.id}
             role="status"
-            className={`pointer-events-auto rounded-md border px-3 py-2 text-sm shadow ${
+            className={`pointer-events-auto rounded-lg border px-3 py-2.5 text-sm shadow-[var(--shadow-pop)] ${
               item.tone === "err"
                 ? "border-red-200 bg-red-50 text-red-800"
                 : "border-line bg-white text-charcoal"

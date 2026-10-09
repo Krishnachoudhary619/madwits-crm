@@ -8,7 +8,17 @@ import { formatDate } from "@/lib/dates";
 import { errorMessage } from "@/lib/errors";
 import type { Customer, CustomerJobSummary } from "@/types/api";
 import { ActiveBadge, LeadBadge } from "@/components/StatusBadge";
-import { Button, Card, ErrorBanner, PageHeader, Pagination, Spinner } from "@/components/ui";
+import {
+  buttonClass,
+  Button,
+  Card,
+  ErrorBanner,
+  PageHeader,
+  Pagination,
+  RecordCard,
+  ResponsiveRecords,
+  Spinner,
+} from "@/components/ui";
 import { CustomerForm } from "@/features/customers/CustomerForm";
 import { useToast } from "@/components/Toast";
 import { nameById, useCatalogs } from "@/hooks/useCatalogs";
@@ -40,7 +50,7 @@ export default function CustomerDetailPage() {
   }, [load]);
 
   async function toggleActive() {
-    if (!customer) return;
+    if (!customer || busy) return;
     setBusy(true);
     try {
       const updated = await customersApi.update(customer.id, { is_active: !customer.is_active });
@@ -61,6 +71,15 @@ export default function CustomerDetailPage() {
       <PageHeader
         title={customer.name}
         description={customer.business_name || "Customer profile"}
+        breadcrumb={
+          <>
+            <Link href="/customers" className="hover:underline">
+              Customers
+            </Link>
+            {" / "}
+            {customer.name}
+          </>
+        }
         actions={
           <>
             <Button variant="secondary" onClick={() => setEditing(true)}>
@@ -69,79 +88,99 @@ export default function CustomerDetailPage() {
             <Button variant="secondary" disabled={busy} onClick={() => void toggleActive()}>
               {customer.is_active ? "Deactivate" : "Reactivate"}
             </Button>
-            <Link href={`/enquiries?customer_id=${customer.id}`}>
-              <Button>New enquiry</Button>
+            <Link href={`/enquiries?customer_id=${customer.id}`} className={buttonClass()}>
+              New enquiry
             </Link>
           </>
         }
       />
       {error ? <ErrorBanner message={error} /> : null}
       <div className="grid gap-4 lg:grid-cols-3">
-        <Card className="p-4 lg:col-span-1">
-          <h2 className="mb-3 font-medium">Contact</h2>
-          <dl className="space-y-2 text-sm">
+        <Card className="p-4 sm:p-5 lg:col-span-1">
+          <h2 className="section-title mb-3 text-charcoal">Contact</h2>
+          <dl className="space-y-3">
             <div>
-              <dt className="text-muted">Phone</dt>
-              <dd>{customer.phone}</dd>
+              <dt className="meta-text">Phone</dt>
+              <dd className="body-text font-medium">{customer.phone}</dd>
             </div>
+            {customer.address ? (
+              <div>
+                <dt className="meta-text">Address</dt>
+                <dd className="whitespace-pre-wrap body-text">{customer.address}</dd>
+              </div>
+            ) : null}
+            {customer.notes ? (
+              <div>
+                <dt className="meta-text">Notes</dt>
+                <dd className="whitespace-pre-wrap body-text">{customer.notes}</dd>
+              </div>
+            ) : null}
             <div>
-              <dt className="text-muted">Address</dt>
-              <dd className="whitespace-pre-wrap">{customer.address || "—"}</dd>
-            </div>
-            <div>
-              <dt className="text-muted">Notes</dt>
-              <dd className="whitespace-pre-wrap">{customer.notes || "—"}</dd>
-            </div>
-            <div>
-              <dt className="text-muted">Status</dt>
-              <dd>
+              <dt className="meta-text">Status</dt>
+              <dd className="mt-1">
                 <ActiveBadge active={customer.is_active} />
               </dd>
             </div>
             <div>
-              <dt className="text-muted">Created</dt>
-              <dd>{formatDate(customer.created_at)}</dd>
+              <dt className="meta-text">Created</dt>
+              <dd className="body-text">{formatDate(customer.created_at)}</dd>
             </div>
           </dl>
         </Card>
         <Card className="lg:col-span-2">
-          <div className="p-4">
-            <h2 className="font-medium">Jobs and quotations</h2>
-            <p className="text-xs text-muted">Previous work for this customer, including stored job titles.</p>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="table-grid">
-              <thead>
-                <tr>
-                  <th>Job</th>
-                  <th>Category</th>
-                  <th>Status</th>
-                  <th>Created</th>
-                </tr>
-              </thead>
-              <tbody>
-                {jobs.map((job) => (
-                  <tr key={job.id}>
-                    <td>
-                      <Link className="font-medium hover:underline" href={`/jobs/${job.id}`}>
-                        {job.job_number}
-                      </Link>
-                      <div className="text-xs text-muted">{job.title}</div>
-                    </td>
-                    <td>{nameById(categories, job.category_id)}</td>
-                    <td>
-                      <LeadBadge status={job.lead_status} />
-                    </td>
-                    <td>{formatDate(job.created_at)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <div className="p-4 sm:p-5">
+            <h2 className="section-title text-charcoal">Jobs and quotations</h2>
+            <p className="meta-text">Previous work for this customer, including stored job titles.</p>
           </div>
           {jobs.length === 0 ? (
-            <p className="px-4 pb-4 text-sm text-muted">No jobs yet for this customer.</p>
+            <p className="px-4 pb-5 body-text text-muted">No jobs yet for this customer.</p>
           ) : (
-            <Pagination page={page} pageSize={20} total={total} onPage={setPage} />
+            <>
+              <div className="px-3 pb-3 md:px-0 md:pb-0">
+                <ResponsiveRecords
+                  cards={jobs.map((job) => (
+                    <RecordCard
+                      key={job.id}
+                      href={`/jobs/${job.id}`}
+                      title={job.job_number}
+                      subtitle={job.title || nameById(categories, job.category_id)}
+                      extra={<LeadBadge status={job.lead_status} />}
+                      meta={<span>Created {formatDate(job.created_at)}</span>}
+                    />
+                  ))}
+                  table={
+                    <table className="table-grid">
+                      <thead>
+                        <tr>
+                          <th>Job</th>
+                          <th>Category</th>
+                          <th>Status</th>
+                          <th>Created</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {jobs.map((job) => (
+                          <tr key={job.id}>
+                            <td>
+                              <Link className="font-medium hover:underline" href={`/jobs/${job.id}`}>
+                                {job.job_number}
+                              </Link>
+                              <div className="meta-text">{job.title}</div>
+                            </td>
+                            <td>{nameById(categories, job.category_id)}</td>
+                            <td>
+                              <LeadBadge status={job.lead_status} />
+                            </td>
+                            <td>{formatDate(job.created_at)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  }
+                />
+              </div>
+              <Pagination page={page} pageSize={20} total={total} onPage={setPage} />
+            </>
           )}
         </Card>
       </div>

@@ -7,7 +7,20 @@ import { dateToIsoEnd, dateToIsoStart, formatDateTime } from "@/lib/dates";
 import { errorMessage } from "@/lib/errors";
 import { formatInr } from "@/lib/money";
 import type { Job, JobBalance, Payment } from "@/types/api";
-import { Button, Card, EmptyState, ErrorBanner, Input, PageHeader, Pagination, Select, Spinner } from "@/components/ui";
+import {
+  Button,
+  Card,
+  EmptyState,
+  ErrorBanner,
+  FilterPanel,
+  Input,
+  PageHeader,
+  Pagination,
+  RecordCard,
+  ResponsiveRecords,
+  Select,
+  Spinner,
+} from "@/components/ui";
 import { PaymentBadge } from "@/components/StatusBadge";
 import { PaymentModal } from "@/features/jobs/JobActions";
 import { useCatalogs, nameById } from "@/hooks/useCatalogs";
@@ -93,16 +106,24 @@ export default function PaymentsPage() {
       <PageHeader
         title="Payments & outstanding"
         description="Payment rows come from /payments. Outstanding totals come from the dashboard; the table below shows balances for the current confirmed-job page only."
-        actions={<Button onClick={() => window.scrollTo({ top: document.body.scrollHeight, behavior: "smooth" })}>Outstanding</Button>}
+        actions={
+          <Button
+            variant="secondary"
+            onClick={() => document.getElementById("outstanding")?.scrollIntoView({ behavior: "smooth" })}
+          >
+            Outstanding
+          </Button>
+        }
       />
-      <Card className="mb-4 p-4">
-        <div className="grid gap-3 md:grid-cols-3">
+      <FilterPanel>
+        <div className="grid gap-3 sm:grid-cols-3">
           <Select
             value={method}
             onChange={(event) => {
               setPage(1);
               setMethod(event.target.value);
             }}
+            aria-label="Payment method"
           >
             <option value="">All methods</option>
             <option value="CASH">Cash</option>
@@ -112,7 +133,7 @@ export default function PaymentsPage() {
           <Input type="date" value={from} onChange={(event) => { setPage(1); setFrom(event.target.value); }} aria-label="Paid from" />
           <Input type="date" value={to} onChange={(event) => { setPage(1); setTo(event.target.value); }} aria-label="Paid to" />
         </div>
-      </Card>
+      </FilterPanel>
       {error ? <ErrorBanner message={error} /> : null}
       {loading ? (
         <Spinner />
@@ -120,53 +141,103 @@ export default function PaymentsPage() {
         <EmptyState title="No payments in this view" description="Record a payment from a confirmed job card." />
       ) : (
         <Card>
-          <div className="overflow-x-auto">
-            <table className="table-grid">
-              <thead>
-                <tr>
-                  <th>Date</th>
-                  <th>Job</th>
-                  <th>Customer</th>
-                  <th>Method</th>
-                  <th>Reference</th>
-                  <th>Amount</th>
-                </tr>
-              </thead>
-              <tbody>
-                {items.map((payment) => {
-                  const job = jobMap[payment.job_id];
-                  return (
-                    <tr key={payment.id}>
-                      <td>{formatDateTime(payment.paid_at)}</td>
-                      <td>
-                        {job ? (
-                          <Link className="hover:underline" href={`/jobs/${job.id}`}>
-                            {job.job_number}
-                          </Link>
-                        ) : (
-                          payment.job_id
-                        )}
-                      </td>
-                      <td>{job ? nameById(customers, job.customer_id) : "—"}</td>
-                      <td>{payment.payment_method}</td>
-                      <td>{payment.reference_number || "—"}</td>
-                      <td>{formatInr(payment.amount)}</td>
+          <div className="p-3 md:p-0">
+            <ResponsiveRecords
+              cards={items.map((payment) => {
+                const job = jobMap[payment.job_id];
+                return (
+                  <RecordCard
+                    key={payment.id}
+                    href={job ? `/jobs/${job.id}` : "/payments"}
+                    title={formatInr(payment.amount)}
+                    subtitle={job ? `${job.job_number} · ${nameById(customers, job.customer_id)}` : payment.job_id}
+                    extra={<span className="meta-text">{payment.payment_method}</span>}
+                    meta={
+                      <>
+                        <span>{formatDateTime(payment.paid_at)}</span>
+                        {payment.reference_number ? <span>{payment.reference_number}</span> : null}
+                      </>
+                    }
+                  />
+                );
+              })}
+              table={
+                <table className="table-grid">
+                  <thead>
+                    <tr>
+                      <th>Date</th>
+                      <th>Job</th>
+                      <th>Customer</th>
+                      <th>Method</th>
+                      <th>Reference</th>
+                      <th>Amount</th>
                     </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+                  </thead>
+                  <tbody>
+                    {items.map((payment) => {
+                      const job = jobMap[payment.job_id];
+                      return (
+                        <tr key={payment.id}>
+                          <td>{formatDateTime(payment.paid_at)}</td>
+                          <td>
+                            {job ? (
+                              <Link className="hover:underline" href={`/jobs/${job.id}`}>
+                                {job.job_number}
+                              </Link>
+                            ) : (
+                              payment.job_id
+                            )}
+                          </td>
+                          <td>{job ? nameById(customers, job.customer_id) : "—"}</td>
+                          <td>{payment.payment_method}</td>
+                          <td>{payment.reference_number || "—"}</td>
+                          <td className="money">{formatInr(payment.amount)}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              }
+            />
           </div>
           <Pagination page={page} pageSize={20} total={total} onPage={setPage} />
         </Card>
       )}
 
-      <h2 className="mt-8 text-lg font-semibold">Outstanding confirmed jobs</h2>
-      <p className="mb-3 text-sm text-muted">
-        Shop-wide outstanding balance: <strong>{formatInr(outstandingTotal)}</strong>
+      <h2 id="outstanding" className="section-title mt-8 text-charcoal">
+        Outstanding confirmed jobs
+      </h2>
+      <p className="mb-3 body-text text-muted">
+        Shop-wide outstanding balance: <strong className="money text-charcoal">{formatInr(outstandingTotal)}</strong>
       </p>
       <Card>
-        <div className="overflow-x-auto">
+        <div className="space-y-2 p-3 md:hidden">
+          {outstandingJobs.map((job) => (
+            <div key={job.id} className="rounded-xl border border-line bg-white p-3.5">
+              <div className="flex items-start justify-between gap-2">
+                <Link href={`/jobs/${job.id}`} className="font-medium hover:underline">
+                  {job.job_number}
+                </Link>
+                {job.balance ? <PaymentBadge status={job.balance.payment_status} /> : null}
+              </div>
+              <p className="mt-0.5 body-text text-muted">{nameById(customers, job.customer_id)}</p>
+              <p className="money mt-2 text-lg font-semibold">{formatInr(job.balance?.balance)}</p>
+              <p className="meta-text">
+                Due {formatInr(job.balance?.amount_due)} · Paid {formatInr(job.balance?.total_paid)}
+              </p>
+              {job.balance && job.balance.payment_status !== "PAID" ? (
+                <Button
+                  className="mt-3 w-full"
+                  variant="secondary"
+                  onClick={() => setPayingJob({ ...job, balance: job.balance as JobBalance })}
+                >
+                  Record payment
+                </Button>
+              ) : null}
+            </div>
+          ))}
+        </div>
+        <div className="hidden overflow-x-auto md:block">
           <table className="table-grid">
             <thead>
               <tr>
@@ -188,9 +259,9 @@ export default function PaymentsPage() {
                     </Link>
                   </td>
                   <td>{nameById(customers, job.customer_id)}</td>
-                  <td>{formatInr(job.balance?.amount_due)}</td>
-                  <td>{formatInr(job.balance?.total_paid)}</td>
-                  <td>{formatInr(job.balance?.balance)}</td>
+                  <td className="money">{formatInr(job.balance?.amount_due)}</td>
+                  <td className="money">{formatInr(job.balance?.total_paid)}</td>
+                  <td className="money font-medium">{formatInr(job.balance?.balance)}</td>
                   <td>{job.balance ? <PaymentBadge status={job.balance.payment_status} /> : "—"}</td>
                   <td>
                     {job.balance && job.balance.payment_status !== "PAID" ? (

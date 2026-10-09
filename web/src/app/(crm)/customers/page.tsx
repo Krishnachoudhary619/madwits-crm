@@ -7,7 +7,18 @@ import { formatDate } from "@/lib/dates";
 import { errorMessage } from "@/lib/errors";
 import type { Customer } from "@/types/api";
 import { ActiveBadge } from "@/components/StatusBadge";
-import { Button, Card, EmptyState, ErrorBanner, Input, PageHeader, Pagination, Spinner } from "@/components/ui";
+import {
+  Button,
+  Card,
+  EmptyState,
+  ErrorBanner,
+  Input,
+  PageHeader,
+  Pagination,
+  RecordCard,
+  ResponsiveRecords,
+  Spinner,
+} from "@/components/ui";
 import { CustomerForm } from "@/features/customers/CustomerForm";
 import { useToast } from "@/components/Toast";
 
@@ -65,6 +76,7 @@ export default function CustomersPage() {
             setPage(1);
             setQ(event.target.value);
           }}
+          aria-label="Search customers"
         />
       </Card>
       {error ? <ErrorBanner message={error} /> : null}
@@ -78,35 +90,54 @@ export default function CustomersPage() {
         />
       ) : (
         <Card>
-          <div className="overflow-x-auto">
-            <table className="table-grid">
-              <thead>
-                <tr>
-                  <th>Name</th>
-                  <th>Phone</th>
-                  <th>Business</th>
-                  <th>Status</th>
-                  <th>Created</th>
-                </tr>
-              </thead>
-              <tbody>
-                {items.map((customer) => (
-                  <tr key={customer.id}>
-                    <td>
-                      <Link className="font-medium hover:underline" href={`/customers/${customer.id}`}>
-                        {customer.name}
-                      </Link>
-                    </td>
-                    <td>{customer.phone}</td>
-                    <td>{customer.business_name || "—"}</td>
-                    <td>
-                      <ActiveBadge active={customer.is_active} />
-                    </td>
-                    <td>{formatDate(customer.created_at)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <div className="p-3 md:p-0">
+            <ResponsiveRecords
+              cards={items.map((customer) => (
+                <RecordCard
+                  key={customer.id}
+                  href={`/customers/${customer.id}`}
+                  title={customer.name}
+                  subtitle={customer.phone}
+                  extra={<ActiveBadge active={customer.is_active} />}
+                  meta={
+                    <>
+                      <span>{customer.business_name || "No business name"}</span>
+                      <span>Added {formatDate(customer.created_at)}</span>
+                    </>
+                  }
+                />
+              ))}
+              table={
+                <table className="table-grid">
+                  <thead>
+                    <tr>
+                      <th>Name</th>
+                      <th>Phone</th>
+                      <th>Business</th>
+                      <th>Status</th>
+                      <th>Created</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {items.map((customer) => (
+                      <tr key={customer.id}>
+                        <td>
+                          <Link className="font-medium hover:underline" href={`/customers/${customer.id}`}>
+                            {customer.name}
+                          </Link>
+                        </td>
+                        <td>{customer.phone}</td>
+                        <td>{customer.business_name || "—"}</td>
+                        <td>
+                          <ActiveBadge active={customer.is_active} />
+                        </td>
+                        <td>{formatDate(customer.created_at)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              }
+            />
           </div>
           <Pagination page={page} pageSize={20} total={total} onPage={setPage} />
         </Card>

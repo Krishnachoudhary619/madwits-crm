@@ -8,11 +8,38 @@ import { errorMessage } from "@/lib/errors";
 import { allowedStageTargets, listAllJobs } from "@/lib/jobs";
 import { formatInr } from "@/lib/money";
 import type { Job, WorkflowStage } from "@/types/api";
-import { Button, Card, EmptyState, ErrorBanner, Field, PageHeader, Select, Spinner, Textarea } from "@/components/ui";
+import { Button, Card, EmptyState, ErrorBanner, Field, Modal, PageHeader, Select, Spinner, Textarea } from "@/components/ui";
 import { AttributionSelect } from "@/features/jobs/AttributionSelect";
 import { useCatalogs, nameById } from "@/hooks/useCatalogs";
 import { useToast } from "@/components/Toast";
 import { ApiError } from "@/lib/errors";
+
+function JobCard({
+  job,
+  customerName,
+  categoryName,
+  onMove,
+}: {
+  job: Job;
+  customerName: string;
+  categoryName: string;
+  onMove: (job: Job) => void;
+}) {
+  return (
+    <Card className="p-3">
+      <Link href={`/jobs/${job.id}`} className="font-medium hover:underline">
+        {job.job_number}
+      </Link>
+      <p className="body-text">{customerName}</p>
+      <p className="meta-text">{categoryName}</p>
+      <p className="mt-1 meta-text">Due {formatDate(job.due_date)}</p>
+      <p className="money body-text font-medium">{formatInr(job.final_amount ?? job.quoted_amount)}</p>
+      <Button className="mt-2 w-full" variant="secondary" onClick={() => onMove(job)}>
+        Change stage
+      </Button>
+    </Card>
+  );
+}
 
 export default function ProductionPage() {
   const toast = useToast();
@@ -20,6 +47,7 @@ export default function ProductionPage() {
   const [jobs, setJobs] = useState<Job[]>([]);
   const [categoryId, setCategoryId] = useState("");
   const [stageFilter, setStageFilter] = useState("");
+  const [mobileStage, setMobileStage] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [moving, setMoving] = useState<Job | null>(null);
@@ -76,8 +104,20 @@ export default function ProductionPage() {
     return map;
   }, [jobs]);
 
+  useEffect(() => {
+    if (!mobileStage && columns[0]) setMobileStage(columns[0].id);
+  }, [columns, mobileStage]);
+
+  function beginMove(job: Job) {
+    const targets = allowedStageTargets(stagesByCategory[job.category_id] ?? [], job.current_stage_id);
+    setMoving(job);
+    setToStage(targets[0]?.id ?? "");
+    setNotes("");
+    setError("");
+  }
+
   async function submitMove() {
-    if (!moving) return;
+    if (!moving || busy) return;
     setBusy(true);
     setError("");
     try {
@@ -103,6 +143,10 @@ export default function ProductionPage() {
     }
   }
 
+  const unassigned = jobsByStage.get("unassigned") ?? [];
+  const selectedMobileJobs =
+    mobileStage === "unassigned" ? unassigned : (jobsByStage.get(mobileStage) ?? []);
+
   return (
     <div>
       <PageHeader
@@ -120,6 +164,7 @@ export default function ProductionPage() {
           onChange={(event) => {
             setCategoryId(event.target.value);
             setStageFilter("");
+            setMobileStage("");
           }}
           aria-label="Filter category"
         >
@@ -140,7 +185,7 @@ export default function ProductionPage() {
           ))}
         </Select>
       </div>
-      {error ? <ErrorBanner message={error} /> : null}
+      {error && !moving ? <ErrorBanner message={error} /> : null}
       {loading ? (
         <Spinner />
       ) : columns.length === 0 ? (
@@ -149,96 +194,116 @@ export default function ProductionPage() {
           description="Configure print categories and stages before using the production board."
         />
       ) : (
-        <div className="flex gap-3 overflow-x-auto pb-4">
-          {(jobsByStage.get("unassigned") ?? []).length > 0 ? (
-            <section className="w-72 shrink-0">
-              <h2 className="mb-2 text-sm font-medium">Unassigned</h2>
-              <div className="space-y-2">
-                {(jobsByStage.get("unassigned") ?? []).map((job) => (
-                  <Card key={job.id} className="p-3">
-                    <Link href={`/jobs/${job.id}`} className="font-medium hover:underline">
-                      {job.job_number}
-                    </Link>
-                    <p className="text-sm">{nameById(customers, job.customer_id)}</p>
-                  </Card>
-                ))}
-              </div>
-            </section>
-          ) : null}
-          {columns.map((stage) => {
-            const columnJobs = jobsByStage.get(stage.id) ?? [];
-            return (
-              <section key={stage.id} className="w-72 shrink-0">
-                <div className="mb-2 flex items-baseline justify-between">
-                  <h2 className="text-sm font-medium text-charcoal">
-                    {stage.name}
-                    <span className="ml-2 text-xs font-normal text-muted">{columnJobs.length}</span>
-                  </h2>
-                  <span className="text-[11px] text-muted">{nameById(categories, stage.category_id)}</span>
-                </div>
+        <>
+          <div className="lg:hidden">
+            <Select
+              aria-label="Production stage"
+              value={mobileStage}
+              onChange={(event) => setMobileStage(event.target.value)}
+            >
+              {unassigned.length > 0 ? (
+                <option value="unassigned">Unassigned ({unassigned.length})</option>
+              ) : null}
+              {columns.map((stage) => (
+                <option key={stage.id} value={stage.id}>
+                  {stage.name} · {nameById(categories, stage.category_id)} (
+                  {(jobsByStage.get(stage.id) ?? []).length})
+                </option>
+              ))}
+            </Select>
+            <div className="mt-3 space-y-2">
+              {selectedMobileJobs.map((job) => (
+                <JobCard
+                  key={job.id}
+                  job={job}
+                  customerName={nameById(customers, job.customer_id)}
+                  categoryName={nameById(categories, job.category_id)}
+                  onMove={beginMove}
+                />
+              ))}
+              {selectedMobileJobs.length === 0 ? (
+                <p className="body-text text-muted">No confirmed jobs in this stage.</p>
+              ) : null}
+            </div>
+          </div>
+          <div className="hidden gap-3 overflow-x-auto pb-4 lg:flex">
+            {unassigned.length > 0 ? (
+              <section className="w-72 shrink-0">
+                <h2 className="card-title mb-2">
+                  Unassigned <span className="ml-1 font-normal text-muted">{unassigned.length}</span>
+                </h2>
                 <div className="space-y-2">
-                  {columnJobs.map((job) => (
-                    <Card key={job.id} className="p-3">
-                      <Link href={`/jobs/${job.id}`} className="font-medium hover:underline">
-                        {job.job_number}
-                      </Link>
-                      <p className="text-sm">{nameById(customers, job.customer_id)}</p>
-                      <p className="text-xs text-muted">{nameById(categories, job.category_id)}</p>
-                      <p className="mt-1 text-xs text-muted">Due {formatDate(job.due_date)}</p>
-                      <p className="text-xs">{formatInr(job.final_amount ?? job.quoted_amount)}</p>
-                      <Button
-                        className="mt-2 w-full"
-                        variant="secondary"
-                        onClick={() => {
-                          const targets = allowedStageTargets(stagesByCategory[job.category_id] ?? [], job.current_stage_id);
-                          setMoving(job);
-                          setToStage(targets[0]?.id ?? "");
-                          setNotes("");
-                        }}
-                      >
-                        Change stage
-                      </Button>
-                    </Card>
+                  {unassigned.map((job) => (
+                    <JobCard
+                      key={job.id}
+                      job={job}
+                      customerName={nameById(customers, job.customer_id)}
+                      categoryName={nameById(categories, job.category_id)}
+                      onMove={beginMove}
+                    />
                   ))}
                 </div>
               </section>
-            );
-          })}
-        </div>
+            ) : null}
+            {columns.map((stage) => {
+              const columnJobs = jobsByStage.get(stage.id) ?? [];
+              return (
+                <section key={stage.id} className="w-72 shrink-0">
+                  <div className="mb-2 flex items-baseline justify-between gap-2">
+                    <h2 className="card-title text-charcoal">
+                      {stage.name}
+                      <span className="ml-2 font-normal text-muted">{columnJobs.length}</span>
+                    </h2>
+                    <span className="meta-text">{nameById(categories, stage.category_id)}</span>
+                  </div>
+                  <div className="space-y-2">
+                    {columnJobs.map((job) => (
+                      <JobCard
+                        key={job.id}
+                        job={job}
+                        customerName={nameById(customers, job.customer_id)}
+                        categoryName={nameById(categories, job.category_id)}
+                        onMove={beginMove}
+                      />
+                    ))}
+                  </div>
+                </section>
+              );
+            })}
+          </div>
+        </>
       )}
       {moving ? (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-charcoal/40 p-4 sm:items-center">
-          <div className="w-full max-w-lg rounded-xl bg-white p-5 shadow-xl">
-            <h2 className="text-lg font-semibold">Move {moving.job_number}</h2>
-            <p className="mt-1 text-sm text-muted">
-              Current stage: {nameById((stagesByCategory[moving.category_id] ?? []).map((s) => ({ id: s.id, name: s.name })), moving.current_stage_id)}
-            </p>
-            <div className="mt-4 space-y-4">
-              <Field label="Next stage">
-                <Select value={toStage} onChange={(event) => setToStage(event.target.value)}>
-                  {allowedStageTargets(stagesByCategory[moving.category_id] ?? [], moving.current_stage_id).map((stage) => (
-                    <option key={stage.id} value={stage.id}>
-                      {stage.name}
-                      {stage.is_final ? " (final)" : ""}
-                    </option>
-                  ))}
-                </Select>
-              </Field>
-              <AttributionSelect value={attribution} onChange={setAttribution} />
-              <Field label="Notes">
-                <Textarea value={notes} onChange={(event) => setNotes(event.target.value)} />
-              </Field>
-            </div>
-            <div className="mt-6 flex justify-end gap-2">
-              <Button variant="secondary" type="button" onClick={() => setMoving(null)} disabled={busy}>
-                Cancel
-              </Button>
-              <Button type="button" disabled={busy || !toStage || !attribution} onClick={() => void submitMove()}>
-                {busy ? "Saving…" : "Update stage"}
-              </Button>
-            </div>
-          </div>
-        </div>
+        <Modal
+          title={`Move ${moving.job_number}`}
+          onClose={() => setMoving(null)}
+          onSubmit={submitMove}
+          busy={busy}
+          submitLabel="Update stage"
+        >
+          {error ? <ErrorBanner message={error} /> : null}
+          <p className="body-text text-muted">
+            Current stage:{" "}
+            {nameById(
+              (stagesByCategory[moving.category_id] ?? []).map((s) => ({ id: s.id, name: s.name })),
+              moving.current_stage_id,
+            )}
+          </p>
+          <Field label="Next stage">
+            <Select value={toStage} onChange={(event) => setToStage(event.target.value)}>
+              {allowedStageTargets(stagesByCategory[moving.category_id] ?? [], moving.current_stage_id).map((stage) => (
+                <option key={stage.id} value={stage.id}>
+                  {stage.name}
+                  {stage.is_final ? " (final)" : ""}
+                </option>
+              ))}
+            </Select>
+          </Field>
+          <AttributionSelect value={attribution} onChange={setAttribution} />
+          <Field label="Notes">
+            <Textarea value={notes} onChange={(event) => setNotes(event.target.value)} />
+          </Field>
+        </Modal>
       ) : null}
     </div>
   );

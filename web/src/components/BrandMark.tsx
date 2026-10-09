@@ -26,8 +26,8 @@ export function BrandMark({ compact = false, inverted = false }: Props) {
       </svg>
       {!compact ? (
         <div className="leading-tight">
-          <div className={`font-semibold tracking-wide ${text}`}>MadWits</div>
-          <div className={`text-xs ${muted}`}>Print shop CRM</div>
+          <div className={`text-[15px] font-semibold tracking-wide ${text}`}>MadWits</div>
+          <div className={`text-[12px] ${muted}`}>Print shop CRM</div>
         </div>
       ) : null}
     </div>

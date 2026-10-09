@@ -65,7 +65,7 @@ export function CustomerForm({
         <Input required value={name} onChange={(event) => setName(event.target.value)} />
       </Field>
       <Field label="Phone">
-        <Input required value={phone} onChange={(event) => setPhone(event.target.value)} />
+        <Input required type="tel" inputMode="tel" autoComplete="tel" value={phone} onChange={(event) => setPhone(event.target.value)} />
       </Field>
       <Field label="Business name">
         <Input value={businessName} onChange={(event) => setBusinessName(event.target.value)} />
