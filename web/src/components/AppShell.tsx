@@ -113,8 +113,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <div className="hidden border-b border-white/10 px-5 py-5 lg:block">
           <BrandMark inverted />
         </div>
-        <div className="flex items-center justify-between border-b border-white/10 px-4 py-3 lg:hidden">
-          <BrandMark inverted />
+        <div className="flex items-center justify-between gap-2 border-b border-white/10 px-4 py-3 lg:hidden">
+          <BrandMark inverted compact />
           <button
             type="button"
             className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-md text-white hover:bg-white/10"

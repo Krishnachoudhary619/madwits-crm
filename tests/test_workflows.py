@@ -138,6 +138,32 @@ def test_stage_ordering_and_final_flag_transfer(
     assert ordered[1]["sequence"] == 2
 
 
+def test_adding_a_final_stage_transfers_the_final_flag(
+    api_client: TestClient, schema_engine: Engine
+) -> None:
+    headers = _headers(api_client, schema_engine)
+    category = api_client.post(
+        "/api/v1/print-categories",
+        headers=headers,
+        json={"name": unique_username("finalxfer")},
+    ).json()
+    first = _complete_first_stage(api_client, headers, category["id"])
+    packing = api_client.post(
+        f"/api/v1/print-categories/{category['id']}/stages",
+        headers=headers,
+        json={"name": "Packing", "is_final": True},
+    )
+    assert packing.status_code == 201, packing.text
+    assert packing.json()["is_final"] is True
+    listed = api_client.get(
+        f"/api/v1/print-categories/{category['id']}/stages", headers=headers
+    ).json()
+    by_id = {item["id"]: item for item in listed}
+    assert by_id[first["id"]]["is_final"] is False
+    assert by_id[first["id"]]["is_initial"] is True
+    assert by_id[packing.json()["id"]]["is_final"] is True
+
+
 def test_incomplete_active_workflow_is_rejected(
     api_client: TestClient, schema_engine: Engine
 ) -> None:

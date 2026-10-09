@@ -201,15 +201,20 @@ def create_stage(
         category_id=category.id,
         name=name.strip(),
         sequence=sequence or next_sequence(db, category.id),
-        is_initial=is_initial,
-        is_final=is_final,
+        is_initial=False,
+        is_final=False,
     )
     if _stage_by_sequence(db, category.id, stage.sequence) is not None:
         raise SequenceConflictError(
             "Another stage already uses this sequence in the category."
         )
     db.add(stage)
-    db.flush()
+    try:
+        db.flush()
+    except IntegrityError as exc:
+        raise DuplicateActiveNameError(
+            "An active stage with this name already exists in the category."
+        ) from exc
     if is_initial:
         _clear_flag(db, category.id, flag="is_initial", except_id=stage.id)
         stage.is_initial = True

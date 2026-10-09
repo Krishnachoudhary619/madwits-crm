@@ -35,37 +35,41 @@ function LoginForm() {
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-canvas px-4 py-8">
-      <div className="w-full max-w-md rounded-2xl border border-line bg-white p-6 shadow-[var(--shadow-card)] sm:p-8">
-        <BrandMark />
-        <h1 className="page-title mt-6 text-charcoal">Sign in</h1>
-        <p className="mt-1 body-text text-muted">
-          Use the shop Staff session for daily work, or Admin for staff management.
-        </p>
-        <form className="mt-6 space-y-4" onSubmit={onSubmit}>
-          {error ? <ErrorBanner message={error} /> : null}
-          <Field label="Username">
-            <Input
-              name="username"
-              autoComplete="username"
-              required
-              value={username}
-              onChange={(event) => setUsername(event.target.value)}
-            />
-          </Field>
-          <Field label="Password">
-            <Input
-              name="password"
-              type="password"
-              autoComplete="current-password"
-              required
-              value={password}
-              onChange={(event) => setPassword(event.target.value)}
-            />
-          </Field>
-          <Button type="submit" className="w-full" disabled={busy}>
-            {busy ? "Signing in…" : "Sign in"}
-          </Button>
-        </form>
+      <div className="w-full max-w-md overflow-hidden rounded-2xl border border-line bg-white shadow-[var(--shadow-card)]">
+        <div className="bg-charcoal px-6 py-5 sm:px-8 sm:py-6">
+          <BrandMark inverted large />
+        </div>
+        <div className="p-6 sm:p-8">
+          <h1 className="page-title text-charcoal">Sign in</h1>
+          <p className="mt-1 body-text text-muted">
+            Use the shop Staff session for daily work, or Admin for staff management.
+          </p>
+          <form className="mt-6 space-y-4" onSubmit={onSubmit}>
+            {error ? <ErrorBanner message={error} /> : null}
+            <Field label="Username">
+              <Input
+                name="username"
+                autoComplete="username"
+                required
+                value={username}
+                onChange={(event) => setUsername(event.target.value)}
+              />
+            </Field>
+            <Field label="Password">
+              <Input
+                name="password"
+                type="password"
+                autoComplete="current-password"
+                required
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+              />
+            </Field>
+            <Button type="submit" className="w-full" disabled={busy}>
+              {busy ? "Signing in…" : "Sign in"}
+            </Button>
+          </form>
+        </div>
       </div>
     </div>
   );

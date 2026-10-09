@@ -1,35 +1,14 @@
-type Props = { compact?: boolean; inverted?: boolean };
+type Props = { compact?: boolean; inverted?: boolean; large?: boolean };
 
-export function BrandMark({ compact = false, inverted = false }: Props) {
-  const text = inverted ? "text-white" : "text-charcoal";
-  const muted = inverted ? "text-white/60" : "text-muted";
+export function BrandMark({ compact = false, large = false }: Props) {
+  const size = compact
+    ? "h-12 w-auto max-w-[12rem] object-contain object-left"
+    : large
+      ? "h-auto w-56 max-w-full object-contain object-left"
+      : "h-auto w-48 max-w-full object-contain object-left";
   return (
-    <div className="flex items-center gap-3">
-      <svg
-        width={compact ? 36 : 44}
-        height={compact ? 36 : 44}
-        viewBox="0 0 44 44"
-        aria-hidden="true"
-      >
-        <rect width="44" height="44" rx="8" fill="#F5C542" />
-        <text
-          x="22"
-          y="29"
-          textAnchor="middle"
-          fontFamily="Georgia, 'Times New Roman', serif"
-          fontSize="18"
-          fontWeight="700"
-          fill="#191919"
-        >
-          MW
-        </text>
-      </svg>
-      {!compact ? (
-        <div className="leading-tight">
-          <div className={`text-[15px] font-semibold tracking-wide ${text}`}>MadWits</div>
-          <div className={`text-[12px] ${muted}`}>Print shop CRM</div>
-        </div>
-      ) : null}
-    </div>
+    // Served from /public; skip next/image so the PNG is not rewritten by the optimizer.
+    // eslint-disable-next-line @next/next/no-img-element
+    <img src="/new-madwits-logo.png" alt="MadWits" className={size} />
   );
 }
