@@ -1,4 +1,5 @@
 from functools import lru_cache
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -27,6 +28,7 @@ class Settings(BaseSettings):
     jwt_secret: str = Field(min_length=32)
     jwt_algorithm: str = "HS256"
     jwt_expire_minutes: int = 720
+    shop_timezone: str = "Asia/Kolkata"
 
     db_connect_retries: int = 10
     db_connect_retry_delay_seconds: float = 1.0
@@ -41,6 +43,12 @@ class Settings(BaseSettings):
             raise ValueError(
                 "Set DATABASE_URL or POSTGRES_USER, POSTGRES_PASSWORD, and POSTGRES_DB."
             )
+        try:
+            ZoneInfo(self.shop_timezone)
+        except ZoneInfoNotFoundError as exc:
+            raise ValueError(
+                f"SHOP_TIMEZONE is not a valid IANA timezone: {self.shop_timezone}"
+            ) from exc
         return self
 
     @property

@@ -29,6 +29,7 @@ services:
       POSTGRES_PORT: "5432"
       JWT_SECRET: ${JWT_SECRET}
       JWT_EXPIRE_MINUTES: ${JWT_EXPIRE_MINUTES:-720}
+      SHOP_TIMEZONE: ${SHOP_TIMEZONE:-Asia/Kolkata}
     ports:
       - "${API_PORT:-8000}:8000"
 

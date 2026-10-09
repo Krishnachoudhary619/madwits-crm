@@ -34,3 +34,47 @@ class IncompleteWorkflowError(ServiceError):
 
 class SequenceConflictError(ServiceError):
     pass
+
+
+class CustomerNotFoundError(ServiceError):
+    pass
+
+
+class CategoryNotFoundError(ServiceError):
+    pass
+
+
+class InactiveCustomerError(ServiceError):
+    pass
+
+
+class InactiveCategoryError(ServiceError):
+    pass
+
+
+class InvalidLifecycleTransitionError(ServiceError):
+    pass
+
+
+class InvalidStageTransitionError(ServiceError):
+    pass
+
+
+class StageConcurrencyError(ServiceError):
+    pass
+
+
+class QuotationRequiredError(ServiceError):
+    pass
+
+
+class PaymentNotAllowedError(ServiceError):
+    pass
+
+
+class OverpaymentError(ServiceError):
+    pass
+
+
+class InvalidPaymentMethodError(ServiceError):
+    pass

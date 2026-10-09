@@ -240,6 +240,6 @@ The following cannot be fully enforced by this schema and must be validated by t
 - Job stage updates and history inserts must commit or roll back together.
 - Attribution identity must not be used for authorization.
 - Allowed inquiry lifecycle transitions.
-- Job-number generation without `MAX(job_number) + 1`.
-- Concurrent stage updates (expected current stage or equivalent). A version column was not added because it is not in the approved schema.
-- Payment-method allow-list, overpayment/refund policy, and idempotency.
+- Job-number generation without `MAX(job_number) + 1`. Phase 5 generates `MW-YYYYMMDD-XXXXXXXX`.
+- Concurrent stage updates (expected current stage or equivalent). A version column was not added because it is not in the approved schema. Phase 5 uses optional `expected_current_stage_id`.
+- Payment-method allow-list, overpayment/refund policy, and idempotency. Phase 6 allows `CASH`, `UPI` and `BANK_TRANSFER`, rejects overpayment with `409`, and does not implement refunds, voids or idempotency keys.

@@ -72,27 +72,43 @@ The API must validate sequence, initial/final stage configuration and stage refe
 
 ## 5. Jobs
 
-- `POST /jobs` — create an inquiry.
+Admin and Staff may use all job endpoints. Staff still cannot access staff-management endpoints.
+
+- `POST /jobs` — create an inquiry (`NEW_INQUIRY`). The server assigns a unique job number; clients cannot supply one.
 - `GET /jobs` — list/search/filter jobs.
 - `GET /jobs/{job_id}` — job detail.
-- `PATCH /jobs/{job_id}` — update permitted job fields.
-- `POST /jobs/{job_id}/quotation` — create/update quotation details if separate action is useful.
-- `POST /jobs/{job_id}/confirm` — confirm the existing job and assign its category's initial production stage.
+- `PATCH /jobs/{job_id}` — update permitted job fields. Does not change `lead_status`, `customer_id`, `category_id` or `job_number`.
+- `POST /jobs/{job_id}/quotation` — save quotation details and move the existing job to `QUOTATION_PREPARED`, or to `AWAITING_CONFIRMATION` when `awaiting_confirmation` is true.
+- `POST /jobs/{job_id}/confirm` — confirm the existing job, copy `quoted_amount` into `final_amount` when final amount is omitted, assign the category's active initial production stage, and append history. Requires `updated_by_user_id`.
 - `POST /jobs/{job_id}/mark-lost` — mark lost with optional reason/notes.
 - `POST /jobs/{job_id}/cancel` — cancel according to the lifecycle rules.
 - `POST /jobs/{job_id}/stage` — update production stage and append status history.
 - `GET /jobs/{job_id}/history` — chronological stage history.
 
-`GET /jobs` should support documented filters including:
-- customer ID or search term.
-- category ID.
-- inquiry lifecycle status.
-- current stage.
-- created date range.
-- due date range.
-- follow-up due/overdue.
-- completed date range where supported.
-- pagination and allowlisted sorting.
+Job numbers use the unique scheme `MW-YYYYMMDD-XXXXXXXX` (UTC date plus eight hex characters). Sequential `MAX(job_number) + 1` is not used.
+
+There is no completed-at column in the approved schema, so completed-date filtering is not implemented.
+
+### Inquiry lifecycle transitions
+
+| From | Allowed targets |
+| --- | --- |
+| `NEW_INQUIRY` | `QUOTATION_PREPARED`, `AWAITING_CONFIRMATION`, `LOST`, `CANCELLED` |
+| `QUOTATION_PREPARED` | `AWAITING_CONFIRMATION`, `CONFIRMED`, `LOST`, `CANCELLED` |
+| `AWAITING_CONFIRMATION` | `QUOTATION_PREPARED` (quotation revised), `CONFIRMED`, `LOST`, `CANCELLED` |
+| `CONFIRMED` | `CANCELLED` |
+| `LOST` | none |
+| `CANCELLED` | none |
+
+Reopening `LOST`, `CANCELLED` or `CONFIRMED` is not implemented. A quotation that has not been confirmed must not receive a production stage.
+
+### Production-stage rules
+
+Confirmed jobs may move to the previous or next *active* stage in the job's category workflow, or directly to that category's active final stage. Cross-category stages, inactive stages, unconfirmed jobs and skipped intermediate non-final stages are rejected with `409`.
+
+`updated_by_user_id` is the selected attribution person, not the authenticated operator. The backend validates that the selected user exists and is active. Invalid attribution returns `400` and writes no history. Job stage and history are committed in one transaction.
+
+Concurrency: `POST /jobs/{job_id}/stage` accepts optional `expected_current_stage_id`. When provided and it does not match the job's current stage, the API returns `409` and makes no change.
 
 ### Stage update request example
 
@@ -100,41 +116,67 @@ The API must validate sequence, initial/final stage configuration and stage refe
 {
   "to_stage_id": "UUID",
   "updated_by_user_id": "UUID",
+  "expected_current_stage_id": "UUID",
   "notes": "Artwork approved by customer"
 }
 ```
 
-`updated_by_user_id` intentionally represents the selected attribution person. It is not a substitute for the authenticated operator. The backend validates that the selected user is active and that the target stage belongs to the job's category. The job's current stage and history entry must be committed atomically.
-
-The API must reject invalid transitions and return a clear conflict/validation error. Define concurrency behavior, preferably using a version or expected-current-stage check.
+`GET /jobs` filters:
+- `q` — job number, title, customer name or phone.
+- `customer_id`, `category_id`, `lead_status` (repeatable), `current_stage_id`.
+- `created_from`, `created_to`, `due_from`, `due_to`.
+- `follow_up_overdue=true` — `next_follow_up_at` is set and not after now.
+- pagination (`page`, `page_size`) and allowlisted sorting (`sort=created_at|updated_at|due_date|next_follow_up_at|job_number|title`, `order=asc|desc`).
 
 ## 6. Payments
 
-- `POST /jobs/{job_id}/payments` — record a payment.
-- `GET /jobs/{job_id}/payments` — payment history.
-- `GET /payments` — filtered payment list if required for reporting.
-- `GET /jobs/{job_id}/balance` — optional endpoint returning amount due, total paid, balance and derived status.
+Admin and Staff may use all payment endpoints. There is no payment delete, void, refund or correction endpoint.
 
-Use decimal amounts. Do not accept client-supplied payment totals or payment status as authoritative values. The backend calculates them from payment records.
+- `POST /jobs/{job_id}/payments` — record a payment against a **confirmed** job.
+- `GET /jobs/{job_id}/payments` — payment history plus the derived balance snapshot.
+- `GET /jobs/{job_id}/balance` — amount due, total paid, outstanding balance and derived payment status.
+- `GET /payments` — filtered payment list (`job_id`, `payment_method`, `paid_from`, `paid_to`, pagination).
 
-Idempotency and overpayment/refund behavior must be defined before those cases are implemented.
+Request fields for `POST /jobs/{job_id}/payments`:
+- `amount` — positive `NUMERIC(12,2)` decimal string/number. Greater than zero.
+- `payment_method` — `CASH`, `UPI` or `BANK_TRANSFER`.
+- `paid_at` — timezone-aware timestamp.
+- `reference_number` — optional.
+- `notes` — optional.
+
+Amount due is the job's `final_amount`. Total paid is the sum of payment rows. Outstanding balance is amount due minus total paid. Derived status:
+- `UNPAID` when total paid is zero and amount due is greater than zero.
+- `PARTIALLY_PAID` when total paid is greater than zero and less than amount due.
+- `PAID` when total paid equals amount due.
+
+The client cannot submit payment totals or payment status; the backend calculates them. Payments are append-only.
+
+A payment that would make total paid exceed amount due is rejected with `409`. Refunds, voids, overpayments and payment-idempotency keys are not implemented; those policies are still unresolved.
 
 ## 7. Dashboard
 
-- `GET /dashboard/summary`
-- `GET /dashboard/jobs-by-stage`
-- `GET /dashboard/jobs-by-category`
-- `GET /dashboard/payments-summary`
+Admin and Staff may use all dashboard endpoints. Calendar dates and "today" use `SHOP_TIMEZONE` (default `Asia/Kolkata`). Stored timestamps remain `TIMESTAMPTZ`. A requested date range is inclusive of both calendar dates in that timezone and is applied as `[start_at, end_at)`. When `from_date` and `to_date` are omitted, the period is the current shop-local month through today.
 
-Where appropriate, these may be consolidated into a small number of endpoints. Avoid unnecessary endpoints if one response can cleanly serve the use case.
+- `GET /dashboard/summary` — snapshot pipeline metrics plus period metrics.
+- `GET /dashboard/jobs-by-stage` — confirmed jobs grouped by current active production stage (zero counts included).
+- `GET /dashboard/jobs-by-category` — job counts per print category, including confirmed / in-production / completed split.
+- `GET /dashboard/payments-summary` — payment totals in the requested period, including per-method breakdown.
 
-Dashboard definitions:
-- Open inquiries: jobs in the defined pre-confirmation lifecycle states, excluding lost/cancelled/confirmed.
-- Open quotation pipeline value: only eligible unconfirmed quotation jobs; do not count confirmed jobs.
-- In production: confirmed jobs not at their final production stage, subject to the approved cancelled/reopened policy.
-- Outstanding balance: final agreed amount minus valid payments on confirmed jobs.
-- Payment received: sum of valid payments within the requested period.
-- Follow-ups due/overdue: based on `next_follow_up_at` and the documented shop timezone.
+`GET /dashboard/summary` and `GET /dashboard/payments-summary` accept `from_date` and `to_date` (`YYYY-MM-DD`).
+
+Definitions:
+- Open inquiries: current jobs in `NEW_INQUIRY`, `QUOTATION_PREPARED` or `AWAITING_CONFIRMATION`.
+- Quotations awaiting confirmation: current jobs in `AWAITING_CONFIRMATION`.
+- Open quotation pipeline value: sum of `quoted_amount` for current `QUOTATION_PREPARED` and `AWAITING_CONFIRMATION` jobs. Confirmed, lost and cancelled jobs are excluded.
+- Follow-ups due today: non-lost, non-cancelled jobs whose `next_follow_up_at` falls on the shop-local current date.
+- Follow-ups overdue: non-lost, non-cancelled jobs whose `next_follow_up_at` is before shop-local today.
+- In production: current `CONFIRMED` jobs whose current stage is missing or is not the category's final stage. Cancelled jobs are not counted (`CANCELLED` is a lifecycle status; reopen is not implemented).
+- Completed jobs in period: current `CONFIRMED` jobs on their category's final stage whose latest history row onto that stage falls in the requested period. There is no `completed_at` column.
+- Inquiry-to-confirmation conversion: jobs **created** in the requested period that are currently `CONFIRMED`, divided by jobs created in that period. The rate is a four-decimal decimal string. Jobs still open in the period remain in the denominator.
+- Payments received: sum of `payments.amount` whose `paid_at` is in the requested period.
+- Outstanding balance: sum of `final_amount - total paid` for current `CONFIRMED` jobs.
+
+Empty datasets return zeros and empty lists, not errors. Production status and payment status are independent.
 
 ## 8. HTTP behavior
 

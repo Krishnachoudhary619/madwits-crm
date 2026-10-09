@@ -43,6 +43,18 @@ def test_builds_sqlalchemy_url_from_postgres_parts(
     )
 
 
+def test_invalid_shop_timezone_fails(monkeypatch: pytest.MonkeyPatch) -> None:
+    with pytest.raises(ValidationError):
+        Settings(
+            _env_file=None,
+            postgres_user="madweb",
+            postgres_password="change-me",
+            postgres_db="madweb_crm",
+            jwt_secret="test-jwt-secret-not-for-production",
+            shop_timezone="Not/A_Zone",
+        )
+
+
 def test_database_url_override_wins(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.delenv("POSTGRES_USER", raising=False)
     monkeypatch.delenv("POSTGRES_PASSWORD", raising=False)

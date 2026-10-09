@@ -8,6 +8,7 @@ os.environ.setdefault("POSTGRES_PASSWORD", "change-me")
 os.environ.setdefault("POSTGRES_DB", "madweb_crm")
 os.environ.setdefault("POSTGRES_HOST", "localhost")
 os.environ.setdefault("POSTGRES_PORT", "5432")
+os.environ.setdefault("SHOP_TIMEZONE", "Asia/Kolkata")
 
 import pytest
 from alembic import command

@@ -83,7 +83,7 @@ Do not create empty layers or repositories solely to match this example. Use the
 - Payment creation and any related consistency checks must use a transaction.
 - Use appropriate indexes for foreign keys, common filters and search patterns.
 - Use NUMERIC/DECIMAL for money.
-- Use timezone-aware timestamps and document the timezone policy.
+- Use timezone-aware timestamps and document the timezone policy. Phase 6 uses `SHOP_TIMEZONE` (default `Asia/Kolkata`) for dashboard calendar days; values are still stored as `TIMESTAMPTZ`.
 
 ## 6. Authentication and session design (approved)
 
