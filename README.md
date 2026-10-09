@@ -1,10 +1,10 @@
-# Madweb CRM
+# MadWits CRM
 
-Backend-first CRM for a single retail printing shop. Frontend development starts only after backend acceptance criteria pass.
+CRM for a single retail printing, stationery, and graphic-design shop.
 
 ## Current phase
 
-Phase 7 — Backend integration and acceptance.
+Phase 8 — Next.js frontend against the accepted FastAPI backend.
 
 ## Prerequisites
 
@@ -23,6 +23,7 @@ Change `POSTGRES_PASSWORD` and `JWT_SECRET` before using anything other than a l
 docker compose up -d --build
 ```
 
+- Web UI: http://localhost:3000
 - API: http://localhost:8000
 - Health: http://localhost:8000/health
 - Database readiness: http://localhost:8000/health/ready
@@ -79,6 +80,29 @@ docker compose exec api python -m app.cli create-admin \
 
 The command fails if an Admin already exists. Create the shared shop-floor Staff account afterwards by logging in as Admin and calling `POST /api/v1/users`. Shop-floor STAFF sessions cannot access staff-management endpoints.
 
+## Frontend (local, without the web Docker service)
+
+The Next.js app lives in `web/`. It talks to FastAPI through a server-side BFF proxy and stores the JWT in an httpOnly cookie. The browser never receives the access token.
+
+```bash
+cp web/.env.example web/.env.local
+cd web
+npm install
+npm run dev
+```
+
+Open http://localhost:3000. The API must already be running on http://127.0.0.1:8000 (or set `API_INTERNAL_URL` in `web/.env.local`).
+
+```bash
+cd web
+npm test
+npm run build
+```
+
+`API_INTERNAL_URL` is a server-only origin. Do not put JWT secrets or database passwords in frontend environment variables.
+
+Logout deletes the browser cookie and calls `POST /api/v1/auth/logout`. That does not revoke a JWT server-side; the token remains valid until it expires.
+
 ## Stack
 
 - Python 3.12
@@ -87,4 +111,5 @@ The command fails if an Admin already exists. Create the shared shop-floor Staff
 - SQLAlchemy 2.x
 - Alembic
 - Pytest
+- Next.js 15 (App Router) + TypeScript + Tailwind CSS
 - Docker Compose

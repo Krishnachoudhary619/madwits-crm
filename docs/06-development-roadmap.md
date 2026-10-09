@@ -128,9 +128,9 @@ Acceptance:
 - Deviations and unresolved issues are documented.
 - No frontend implementation has started.
 
-## Phase 8 — Frontend (future phase)
+## Phase 8 — Frontend
 
-Do not begin until Phase 7 passes and the user approves frontend development. The frontend will consume the documented, tested API rather than redefining backend rules.
+The Next.js application in `web/` consumes the documented FastAPI contract. Do not change backend schemas, migrations, or business rules for frontend convenience.
 
 ## Working protocol
 
