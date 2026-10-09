@@ -4,7 +4,7 @@ Backend-first CRM for a single retail printing shop. Frontend development starts
 
 ## Current phase
 
-Phase 3 — Authentication, sessions and RBAC.
+Phase 4 — Customers, categories and workflow stages.
 
 ## Prerequisites
 

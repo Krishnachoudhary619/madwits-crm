@@ -22,3 +22,15 @@ class InactiveAttributionUserError(ServiceError):
 
 class AttributionUserNotFoundError(ServiceError):
     pass
+
+
+class DuplicateActiveNameError(ServiceError):
+    pass
+
+
+class IncompleteWorkflowError(ServiceError):
+    pass
+
+
+class SequenceConflictError(ServiceError):
+    pass

@@ -47,12 +47,12 @@ The attribution endpoint is not an authorization mechanism. Staff creation must 
 ## 3. Customers
 
 - `POST /customers` — create customer.
-- `GET /customers` — list/search customers; support `q`, pagination and sorting.
+- `GET /customers` — list/search customers; support `q`, pagination (`page`, `page_size`) and allowlisted sorting (`sort=name|phone|created_at`, `order=asc|desc`).
 - `GET /customers/{customer_id}` — customer details.
-- `PATCH /customers/{customer_id}` — update customer.
-- `GET /customers/{customer_id}/jobs` — customer job history.
+- `PATCH /customers/{customer_id}` — update customer, including `is_active`.
+- `GET /customers/{customer_id}/jobs` — customer job history (read-only).
 
-Search by name and phone. Do not assume phone number uniqueness unless approved. Avoid hard deletion when jobs reference the customer.
+Search by name and phone. Phone numbers are not unique. Customers are archived with `is_active=false`; there is no hard-delete endpoint.
 
 ## 4. Printing categories and stages
 
@@ -68,7 +68,7 @@ Stages:
 - `PATCH /workflow-stages/{stage_id}`
 - `POST /workflow-stages/{stage_id}/deactivate` (or an equivalent documented PATCH)
 
-The API must validate sequence, initial/final stage configuration and stage references. Do not hard-delete referenced stages. Permissions must match the approved authorization document; do not invent Admin-only restrictions for operational configuration.
+The API must validate sequence, initial/final stage configuration and stage references. Do not hard-delete referenced stages; deactivate them. Admin and Staff may configure customers, categories and stages. An active category with any active stages must have exactly one active initial stage and one active final stage. Activating a category requires that complete workflow. The first stage of an active category should be both initial and final; later stages can be inserted and the final/initial flags transferred by PATCH.
 
 ## 5. Jobs
 
