@@ -1,12 +1,14 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { customersApi, jobsApi } from "@/lib/api/endpoints";
+import { useState } from "react";
+import { jobsApi } from "@/lib/api/endpoints";
 import { dateToIsoStart, shopDateTime, toDateInput } from "@/lib/dates";
 import { errorMessage } from "@/lib/errors";
 import { specPayload, specText } from "@/lib/jobs";
-import type { Customer, Job, PrintCategory } from "@/types/api";
+import type { Job, PrintCategory } from "@/types/api";
 import { ErrorBanner, Field, Input, Modal, Select, Textarea } from "@/components/ui";
+import { CustomerForm } from "@/features/customers/CustomerForm";
+import { CustomerPicker } from "@/features/customers/CustomerPicker";
 
 export function JobForm({
   job,
@@ -21,9 +23,9 @@ export function JobForm({
 }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  const [customerQuery, setCustomerQuery] = useState("");
-  const [customers, setCustomers] = useState<Customer[]>([]);
   const [customerId, setCustomerId] = useState(job?.customer_id ?? "");
+  const [creatingCustomer, setCreatingCustomer] = useState(false);
+  const [createPrefill, setCreatePrefill] = useState({ name: "", phone: "" });
   const [categoryId, setCategoryId] = useState(job?.category_id ?? "");
   const [title, setTitle] = useState(job?.title ?? "");
   const [description, setDescription] = useState(job?.description ?? "");
@@ -33,19 +35,14 @@ export function JobForm({
   const [followUp, setFollowUp] = useState(toDateInput(job?.next_follow_up_at));
   const [notes, setNotes] = useState(job?.notes ?? "");
 
-  useEffect(() => {
-    const handle = window.setTimeout(() => {
-      void customersApi
-        .list({ page: 1, page_size: 50, sort: "name", order: "asc", q: customerQuery || undefined })
-        .then((page) => setCustomers(page.items))
-        .catch(() => setCustomers([]));
-    }, 200);
-    return () => window.clearTimeout(handle);
-  }, [customerQuery]);
-
   async function onSubmit() {
     setBusy(true);
     setError("");
+    if (!job && !customerId) {
+      setError("Select a customer or create one.");
+      setBusy(false);
+      return;
+    }
     const qty = Number.parseInt(quantity, 10);
     if (!Number.isInteger(qty) || qty < 1) {
       setError("Quantity must be a whole number greater than zero.");
@@ -98,24 +95,19 @@ export function JobForm({
       {error ? <ErrorBanner message={error} /> : null}
       {!job ? (
         <>
-          <Field label="Find customer" hint="Search by name or phone, then select.">
-            <Input
-              value={customerQuery}
-              onChange={(event) => setCustomerQuery(event.target.value)}
-              placeholder="Type to search"
-            />
-          </Field>
-          <Field label="Customer">
-            <Select required value={customerId} onChange={(event) => setCustomerId(event.target.value)}>
-              <option value="">Select customer</option>
-              {customers.map((customer) => (
-                <option key={customer.id} value={customer.id} disabled={!customer.is_active}>
-                  {customer.name} · {customer.phone}
-                  {customer.is_active ? "" : " (inactive)"}
-                </option>
-              ))}
-            </Select>
-          </Field>
+          <CustomerPicker
+            value={customerId}
+            onChange={(id) => setCustomerId(id)}
+            onCreate={(query) => {
+              const trimmed = query.trim();
+              const looksLikePhone = /^\+?\d[\d\s-]{5,}$/.test(trimmed);
+              setCreatePrefill({
+                name: looksLikePhone ? "" : trimmed,
+                phone: looksLikePhone ? trimmed.replace(/\s+/g, "") : "",
+              });
+              setCreatingCustomer(true);
+            }}
+          />
           <Field label="Print category">
             <Select required value={categoryId} onChange={(event) => setCategoryId(event.target.value)}>
               <option value="">Select category</option>
@@ -155,6 +147,18 @@ export function JobForm({
       <Field label="Notes">
         <Textarea value={notes} onChange={(event) => setNotes(event.target.value)} />
       </Field>
+      {creatingCustomer ? (
+        <CustomerForm
+          nested
+          initialName={createPrefill.name}
+          initialPhone={createPrefill.phone}
+          onClose={() => setCreatingCustomer(false)}
+          onSaved={(customer) => {
+            setCustomerId(customer.id);
+            setCreatingCustomer(false);
+          }}
+        />
+      ) : null}
     </Modal>
   );
 }

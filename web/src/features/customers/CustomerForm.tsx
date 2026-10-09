@@ -8,17 +8,23 @@ import { ErrorBanner, Field, Input, Modal, Textarea } from "@/components/ui";
 
 export function CustomerForm({
   customer,
+  initialName = "",
+  initialPhone = "",
+  nested = false,
   onClose,
   onSaved,
 }: {
   customer?: Customer | null;
+  initialName?: string;
+  initialPhone?: string;
+  nested?: boolean;
   onClose: () => void;
   onSaved: (customer: Customer) => void;
 }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  const [name, setName] = useState(customer?.name ?? "");
-  const [phone, setPhone] = useState(customer?.phone ?? "");
+  const [name, setName] = useState(customer?.name ?? initialName);
+  const [phone, setPhone] = useState(customer?.phone ?? initialPhone);
   const [businessName, setBusinessName] = useState(customer?.business_name ?? "");
   const [address, setAddress] = useState(customer?.address ?? "");
   const [notes, setNotes] = useState(customer?.notes ?? "");
@@ -51,6 +57,7 @@ export function CustomerForm({
       onClose={onClose}
       onSubmit={onSubmit}
       busy={busy}
+      nested={nested}
       submitLabel={customer ? "Save changes" : "Create customer"}
     >
       {error ? <ErrorBanner message={error} /> : null}

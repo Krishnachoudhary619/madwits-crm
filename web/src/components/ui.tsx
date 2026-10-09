@@ -1,6 +1,7 @@
 "use client";
 
-import { FormEvent, ReactNode, SelectHTMLAttributes, TextareaHTMLAttributes, InputHTMLAttributes, ButtonHTMLAttributes } from "react";
+import { FormEvent, ReactNode, SelectHTMLAttributes, TextareaHTMLAttributes, InputHTMLAttributes, ButtonHTMLAttributes, useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 
 export function Button({
   variant = "primary",
@@ -155,6 +156,7 @@ export function Modal({
   onSubmit,
   submitLabel = "Save",
   busy = false,
+  nested = false,
 }: {
   title: string;
   children: ReactNode;
@@ -162,13 +164,26 @@ export function Modal({
   onSubmit?: (event: FormEvent) => void;
   submitLabel?: string;
   busy?: boolean;
+  nested?: boolean;
 }) {
-  return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-charcoal/40 p-4 sm:items-center" role="dialog" aria-modal="true" aria-labelledby="dialog-title">
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+  if (!mounted) return null;
+
+  return createPortal(
+    <div
+      className={`fixed inset-0 flex items-end justify-center bg-charcoal/40 p-4 sm:items-center ${nested ? "z-[70]" : "z-50"}`}
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="dialog-title"
+    >
       <form
         className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-xl bg-white p-5 shadow-xl"
         onSubmit={(event) => {
           event.preventDefault();
+          event.stopPropagation();
           onSubmit?.(event);
         }}
       >
@@ -192,7 +207,8 @@ export function Modal({
           ) : null}
         </div>
       </form>
-    </div>
+    </div>,
+    document.body,
   );
 }
 
