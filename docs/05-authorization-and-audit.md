@@ -1,7 +1,7 @@
 # Madweb CRM — Authorization and Audit Rules
 
-**Version:** 1.0  
-**Status:** Required behavior; session implementation needs architecture approval
+**Version:** 1.1  
+**Status:** Required behavior; session design approved (see `docs/02-technical-architecture.md` section 6)
 
 ## 1. Single-shop model
 
@@ -40,9 +40,16 @@ The API should provide active attribution choices without exposing credentials o
 
 ## 4. Authentication and Admin-only staff creation
 
-The business wants a shared system and does not require every shop-floor action to be attributed to the authenticated operator. It does, however, require Admin-only staff creation.
+The approved model is a shared operational STAFF session plus a separate Admin session. See `docs/02-technical-architecture.md` section 6.
 
-The architecture must select and document a secure session approach that satisfies both requirements. Examples to evaluate include a protected Admin management session alongside a shared operational session, or another approved design. These are options, not permission to implement one without review if the choice materially changes the workflow.
+Shop-floor operators authenticate as the shared `STAFF` account (or any active Staff account). The authenticated identity is used only for authorization. Production attribution remains the selected dropdown user.
+
+Staff-management endpoints are Admin-only and must be enforced server-side. Shop-floor STAFF sessions must never succeed against:
+- `POST /api/v1/users`
+- `GET /api/v1/users`
+- `PATCH /api/v1/users/{user_id}`
+
+Operational endpoints that exist in this phase, including `GET /api/v1/users/attribution-options`, are allowed for both Admin and Staff.
 
 Do not:
 - Treat the attribution dropdown as authentication.
@@ -51,8 +58,7 @@ Do not:
 - Use a hardcoded or publicly accessible default Admin credential.
 - Silently require every employee to have a personal login solely to make attribution work.
 - Claim that a role dropdown alone is secure authorization.
-
-If the intended real-world Admin-only staff creation flow cannot be securely implemented without an unresolved product decision, stop and ask the owner.
+- Trust a JWT role claim without loading the current user from the database.
 
 ## 5. Status history
 

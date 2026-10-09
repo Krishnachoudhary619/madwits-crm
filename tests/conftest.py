@@ -2,6 +2,7 @@ import os
 from collections.abc import Generator
 
 os.environ["APP_ENV"] = "test"
+os.environ["JWT_SECRET"] = "test-jwt-secret-not-for-production"
 os.environ.setdefault("POSTGRES_USER", "madweb")
 os.environ.setdefault("POSTGRES_PASSWORD", "change-me")
 os.environ.setdefault("POSTGRES_DB", "madweb_crm")
@@ -16,6 +17,7 @@ from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session, sessionmaker
 
 from app.core.config import get_settings
+from app.db.session import get_db
 from app.main import app
 from tests.db_support import (
     TEST_SCHEMA_DB,
@@ -67,3 +69,21 @@ def db_session(schema_engine: Engine) -> Generator[Session, None, None]:
         if transaction.is_active:
             transaction.rollback()
         connection.close()
+
+
+@pytest.fixture
+def api_client(schema_engine: Engine) -> Generator[TestClient, None, None]:
+    def override_get_db() -> Generator[Session, None, None]:
+        session = sessionmaker(
+            bind=schema_engine, autoflush=False, expire_on_commit=False
+        )()
+        try:
+            yield session
+        finally:
+            session.close()
+
+    app.dependency_overrides[get_db] = override_get_db
+    get_settings.cache_clear()
+    with TestClient(app) as test_client:
+        yield test_client
+    app.dependency_overrides.clear()

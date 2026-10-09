@@ -4,7 +4,7 @@ Backend-first CRM for a single retail printing shop. Frontend development starts
 
 ## Current phase
 
-Phase 2 — Schema and migrations.
+Phase 3 — Authentication, sessions and RBAC.
 
 ## Prerequisites
 
@@ -15,7 +15,7 @@ Phase 2 — Schema and migrations.
 cp .env.example .env
 ```
 
-Change `POSTGRES_PASSWORD` before using anything other than a local disposable environment.
+Change `POSTGRES_PASSWORD` and `JWT_SECRET` before using anything other than a local disposable environment.
 
 ## Start services
 
@@ -68,7 +68,16 @@ Do not use that command against a database you need to keep.
 
 ## Initial Admin
 
-Admin provisioning is implemented in Phase 3. Do not ship a default Admin password.
+There is no default Admin password. After migrations, create the first Admin:
+
+```bash
+docker compose exec api python -m app.cli create-admin \
+  --username owner \
+  --display-name "Shop Owner" \
+  --password 'choose-a-strong-password'
+```
+
+The command fails if an Admin already exists. Create the shared shop-floor Staff account afterwards by logging in as Admin and calling `POST /api/v1/users`. Shop-floor STAFF sessions cannot access staff-management endpoints.
 
 ## Stack
 

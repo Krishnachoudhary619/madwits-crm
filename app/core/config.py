@@ -24,6 +24,10 @@ class Settings(BaseSettings):
     postgres_port: int = 5432
     database_url: str | None = Field(default=None)
 
+    jwt_secret: str = Field(min_length=32)
+    jwt_algorithm: str = "HS256"
+    jwt_expire_minutes: int = 720
+
     db_connect_retries: int = 10
     db_connect_retry_delay_seconds: float = 1.0
 

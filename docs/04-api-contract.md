@@ -31,14 +31,14 @@ Do not expose stack traces or sensitive database details in client errors.
 
 ## 2. Authentication and users
 
-Proposed endpoints, subject to the approved session design:
-- `POST /auth/login`
-- `POST /auth/logout` (if supported by the chosen session/token model)
-- `GET /auth/me`
-- `GET /users/attribution-options`
-- `GET /users`
-- `POST /users` — Admin only; create Staff accounts.
-- `PATCH /users/{user_id}` — update approved user fields and active state.
+Approved endpoints under the session design in `docs/02-technical-architecture.md` section 6:
+- `POST /auth/login` — public; returns a Bearer JWT.
+- `POST /auth/logout` — authenticated; client must discard the token.
+- `GET /auth/me` — authenticated Admin or Staff.
+- `GET /users/attribution-options` — authenticated Admin or Staff; active users only.
+- `GET /users` — Admin only; paginated directory listing.
+- `POST /users` — Admin only; always creates Staff. `role` is not accepted.
+- `PATCH /users/{user_id}` — Admin only; `display_name`, `password`, `is_active`. Role cannot be changed.
 
 `GET /users/attribution-options` returns active owner/Admin and staff entries suitable for the status attribution dropdown. It must not expose passwords or security-sensitive fields.
 

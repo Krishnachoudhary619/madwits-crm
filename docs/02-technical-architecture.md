@@ -22,7 +22,7 @@
 - SQLAlchemy 2.x.
 - Alembic.
 - Pydantic.
-- JWT-based API authentication/session approach with secure password hashing, subject to the decision in section 6.
+- JWT-based API authentication with bcrypt password hashing, as approved in section 6.
 - Pytest.
 - Docker and Docker Compose.
 - FastAPI OpenAPI/Swagger documentation.
@@ -85,18 +85,52 @@ Do not create empty layers or repositories solely to match this example. Use the
 - Use NUMERIC/DECIMAL for money.
 - Use timezone-aware timestamps and document the timezone policy.
 
-## 6. Authentication and session decision
+## 6. Authentication and session design (approved)
 
-Business requirements specify Admin and Staff roles, with Admin-only staff creation. They also specify a shared shop system and a dropdown that intentionally attributes stage changes to a selected person, not necessarily the authenticated operator.
+Approved 9 October 2026. This reconciles the shared shop-floor system with Admin-only staff creation.
 
-Before implementation, document a concrete secure approach for:
-- Establishing an authorized Admin session.
-- Staff account creation by Admin.
-- How the shared system's operator/session is represented.
-- How Admin-only staff creation is enforced even if individual shop-floor staff do not personally sign in for each action.
-- How the selected attribution user remains separate from the authenticated actor.
+### Two session kinds, one user directory
 
-Do not treat the attribution dropdown as authentication. Do not use the dropdown value to grant privileges. Do not silently introduce per-employee login requirements that contradict the intended workflow. If a secure session model cannot be reconciled with the expected shared-system operation, ask for clarification before implementing staff provisioning or protected routes.
+Shop-floor work uses a **shared operational STAFF session**. Administrative account management uses an **Admin session**. Attribution is a separate request field and is never used to authenticate or authorize.
+
+**Shared operational session**
+- One `STAFF` account (for example `shop` or `counter`) is used on the shared computer during the working day.
+- That session has all operational CRM permissions (customers, jobs, payments, dashboard, attribution dropdown).
+- It must not access staff-management endpoints. The server rejects `POST /users`, `GET /users` (directory listing) and `PATCH /users/{user_id}` with `403` for `STAFF`.
+- Individual employees do not need personal logins to attribute work. They choose the person from the attribution dropdown.
+
+**Admin management session**
+- The owner authenticates with an Admin username and password.
+- The session has the same operational permissions as Staff, plus staff management.
+- Only this role may create, list (full directory) and update staff accounts.
+- `POST /users` always creates `STAFF`. A client-supplied `role=ADMIN` is rejected. Role comes from the authenticated user's database row, not from the request body or attribution dropdown.
+
+**Staff directory records**
+- Created only by Admin.
+- They may log in later, but daily shop-floor work does not require it.
+- Inactive users cannot authenticate and are omitted from attribution options.
+- History keeps their ID after deactivation.
+
+### Tokens and passwords
+
+- Clients send `Authorization: Bearer <jwt>`.
+- JWT subject is the authenticated `users.id`. Tokens are signed with `JWT_SECRET` from the environment.
+- Authorization loads the user from the database on each request (active status and role). A token for a deactivated user is rejected.
+- Access tokens expire after 12 hours by default (shop-day). `POST /auth/logout` instructs the client to discard the token; this phase does not persist a server-side denylist.
+- Passwords are hashed with bcrypt. No default Admin password is shipped.
+
+### Initial Admin provisioning
+
+- Documented CLI only: `docker compose exec api python -m app.cli create-admin --username … --display-name … --password …`
+- Creates the first Admin and fails if an Admin already exists.
+- Password is supplied on the command line or environment, never committed.
+
+### Attribution
+
+- `GET /users/attribution-options` is an operational endpoint for Admin and Staff. It returns active users (`id`, `display_name`, `username`, `role`) with no password hashes.
+- Later stage-update APIs accept `updated_by_user_id` as the selected person. That value must not grant privileges or replace the authenticated caller.
+
+Do not treat the attribution dropdown as authentication. Do not use the dropdown value to grant privileges. Do not require every employee to sign in solely to use the dropdown.
 
 ## 7. Configuration and secrets
 
