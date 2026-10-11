@@ -3,7 +3,7 @@ import type { LeadStatus } from "@/types/api";
 export const LEAD_LABELS: Record<LeadStatus, string> = {
   NEW_INQUIRY: "New enquiry",
   QUOTATION_PREPARED: "Quotation prepared",
-  AWAITING_CONFIRMATION: "Awaiting confirmation",
+  AWAITING_CONFIRMATION: "Waiting for customer",
   CONFIRMED: "Confirmed",
   LOST: "Lost",
   CANCELLED: "Cancelled",

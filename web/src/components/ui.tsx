@@ -196,14 +196,14 @@ export function Modal({
 
   return createPortal(
     <div
-      className={`fixed inset-0 flex items-end justify-center bg-charcoal/45 p-0 sm:items-center sm:p-4 ${nested ? "z-[70]" : "z-50"}`}
+      className={`fixed inset-0 flex items-end justify-center overflow-hidden bg-charcoal/45 sm:items-center sm:p-4 ${nested ? "z-[70]" : "z-50"}`}
       role="dialog"
       aria-modal="true"
       aria-labelledby="dialog-title"
       onClick={onClose}
     >
       <form
-        className="flex max-h-[92dvh] w-full max-w-lg flex-col rounded-t-2xl bg-white shadow-[var(--shadow-pop)] sm:rounded-xl"
+        className="flex max-h-[100svh] w-full max-w-lg flex-col overflow-hidden rounded-t-2xl bg-white shadow-[var(--shadow-pop)] sm:max-h-[min(42rem,92svh)] sm:rounded-xl"
         onClick={(event) => event.stopPropagation()}
         onSubmit={(event) => {
           event.preventDefault();
@@ -212,7 +212,7 @@ export function Modal({
           onSubmit?.(event);
         }}
       >
-        <div className="flex items-start justify-between gap-3 border-b border-line px-5 py-4">
+        <div className="flex shrink-0 items-start justify-between gap-3 border-b border-line px-4 py-3 sm:px-5 sm:py-4">
           <h2 id="dialog-title" className="section-title text-charcoal">
             {title}
           </h2>
@@ -220,13 +220,18 @@ export function Modal({
             ×
           </button>
         </div>
-        <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-5 py-4">{children}</div>
-        <div className="flex justify-end gap-2 border-t border-line bg-white px-5 py-3">
-          <Button type="button" variant="secondary" onClick={onClose} disabled={busy}>
+        <div className="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain px-4 py-4 sm:px-5">
+          {children}
+        </div>
+        <div
+          className={`${onSubmit ? "grid grid-cols-2" : "flex"} shrink-0 gap-2 border-t border-line bg-white px-4 pt-3 sm:flex sm:justify-end sm:px-5`}
+          style={{ paddingBottom: "max(0.75rem, env(safe-area-inset-bottom))" }}
+        >
+          <Button type="button" variant="secondary" className="w-full sm:w-auto" onClick={onClose} disabled={busy}>
             Cancel
           </Button>
           {onSubmit ? (
-            <Button type="submit" disabled={busy}>
+            <Button type="submit" className="w-full sm:w-auto" disabled={busy}>
               {busy ? "Saving…" : submitLabel}
             </Button>
           ) : null}

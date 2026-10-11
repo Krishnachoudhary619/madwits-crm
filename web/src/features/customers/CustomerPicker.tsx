@@ -117,21 +117,31 @@ export function CustomerPicker({
     }
   }
 
+  const menuStyle = menuBox
+    ? (() => {
+        const gap = 8;
+        const spaceBelow = window.innerHeight - menuBox.bottom - gap;
+        const spaceAbove = menuBox.top - gap;
+        const openUp = spaceBelow < 200 && spaceAbove > spaceBelow;
+        const available = openUp ? spaceAbove : spaceBelow;
+        const maxHeight = Math.max(120, Math.min(256, available));
+        const width = Math.min(menuBox.width, window.innerWidth - gap * 2);
+        const left = Math.max(gap, Math.min(menuBox.left, window.innerWidth - width - gap));
+        return openUp
+          ? { position: "fixed" as const, bottom: window.innerHeight - menuBox.top + 4, left, width, maxHeight, zIndex: 80 }
+          : { position: "fixed" as const, top: menuBox.bottom + 4, left, width, maxHeight, zIndex: 80 };
+      })()
+    : undefined;
+
   const menu =
-    open && menuBox && typeof document !== "undefined"
+    open && menuBox && menuStyle && typeof document !== "undefined"
       ? createPortal(
           <div
             ref={menuRef}
             id={listId}
             role="listbox"
-            className="max-h-64 overflow-y-auto rounded-md border border-line bg-white shadow-lg"
-            style={{
-              position: "fixed",
-              top: menuBox.bottom + 4,
-              left: menuBox.left,
-              width: menuBox.width,
-              zIndex: 80,
-            }}
+            className="overflow-y-auto overscroll-contain rounded-md border border-line bg-white shadow-lg"
+            style={menuStyle}
           >
             {loading ? <p className="px-3 py-2 text-sm text-muted">Searching…</p> : null}
             {!loading &&

@@ -31,9 +31,6 @@ export default function CategoriesPage() {
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [stageName, setStageName] = useState("");
-  const [sequence, setSequence] = useState("");
-  const [isInitial, setIsInitial] = useState(false);
-  const [isFinal, setIsFinal] = useState(false);
   const [busy, setBusy] = useState(false);
 
   const load = useCallback(async () => {
@@ -115,24 +112,40 @@ export default function CategoriesPage() {
     }
   }
 
+  function activeInOrder(list: WorkflowStage[] = stages) {
+    return list.filter((stage) => stage.is_active).sort((a, b) => a.sequence - b.sequence);
+  }
+
+  async function reloadStages(categoryId: string) {
+    const listed = await categoriesApi.stages(categoryId);
+    setStages(listed);
+    return listed;
+  }
+
+  async function makeFirstAndLast(list: WorkflowStage[]) {
+    const active = activeInOrder(list);
+    if (active.length === 0) return;
+    const first = active[0];
+    const last = active[active.length - 1];
+    if (!first.is_initial) await stagesApi.update(first.id, { is_initial: true });
+    if (!last.is_final) await stagesApi.update(last.id, { is_final: true });
+  }
+
   async function saveStage() {
     if (!selected) return;
     setBusy(true);
     setError("");
     try {
+      const firstStep = activeInOrder().length === 0;
       await categoriesApi.addStage(selected.id, {
         name: stageName.trim(),
-        sequence: sequence ? Number.parseInt(sequence, 10) : null,
-        is_initial: isInitial,
-        is_final: isFinal,
+        is_initial: firstStep,
+        is_final: true,
       });
       toast("Stage added");
       setAddingStage(false);
       setStageName("");
-      setSequence("");
-      setIsInitial(false);
-      setIsFinal(false);
-      setStages(await categoriesApi.stages(selected.id));
+      await reloadStages(selected.id);
     } catch (err) {
       setError(errorMessage(err));
     } finally {
@@ -140,13 +153,17 @@ export default function CategoriesPage() {
     }
   }
 
-  async function patchStage(stage: WorkflowStage, body: object) {
+  async function moveStage(stage: WorkflowStage, direction: -1 | 1) {
     setBusy(true);
     setError("");
     try {
-      await stagesApi.update(stage.id, body);
-      if (selected) setStages(await categoriesApi.stages(selected.id));
-      toast("Stage updated");
+      await stagesApi.update(stage.id, { sequence: stage.sequence + direction });
+      if (selected) {
+        const listed = await reloadStages(selected.id);
+        await makeFirstAndLast(listed);
+        await reloadStages(selected.id);
+      }
+      toast("Stage order updated");
     } catch (err) {
       setError(errorMessage(err));
     } finally {
@@ -157,16 +174,26 @@ export default function CategoriesPage() {
   async function deactivateStage(stage: WorkflowStage) {
     if (
       !window.confirm(
-        "Stages are deactivated, not hard-deleted, so historical job history can keep its references. Continue?",
+        "This hides the stage from new work. Old jobs keep their history. Continue?",
       )
     ) {
       return;
     }
+    const remaining = activeInOrder().filter((item) => item.id !== stage.id);
+    if (selected?.is_active && remaining.length === 0) {
+      setError("An active category needs at least one step. Add another step first, or deactivate the category.");
+      return;
+    }
     setBusy(true);
+    setError("");
     try {
+      if (remaining.length) {
+        if (stage.is_final) await stagesApi.update(remaining[remaining.length - 1].id, { is_final: true });
+        if (stage.is_initial) await stagesApi.update(remaining[0].id, { is_initial: true });
+      }
       await stagesApi.deactivate(stage.id);
-      if (selected) setStages(await categoriesApi.stages(selected.id));
-      toast("Stage deactivated");
+      if (selected) await reloadStages(selected.id);
+      toast("Stage hidden");
     } catch (err) {
       setError(errorMessage(err));
     } finally {
@@ -180,7 +207,7 @@ export default function CategoriesPage() {
     <div>
       <PageHeader
         title="Categories & workflows"
-        description="Each print category has its own ordered stages. An active category with stages needs exactly one initial and one final active stage."
+        description="Each print type has its own list of steps, in order. The first step starts the job. Each new stage is added at the end and becomes the last step."
         actions={<Button onClick={() => { setEditing("new"); setName(""); setDescription(""); }}>New category</Button>}
       />
       {error ? <ErrorBanner message={error} /> : null}
@@ -229,68 +256,97 @@ export default function CategoriesPage() {
                   </Button>
                 </div>
               </div>
-              <div className="mt-6 flex items-center justify-between">
-                <h3 className="card-title">Workflow stages</h3>
-                <Button onClick={() => setAddingStage(true)}>Add stage</Button>
+              <div className="mt-6 flex items-center justify-between gap-3">
+                <div>
+                  <h3 className="card-title">Job steps</h3>
+                  <p className="meta-text">Work moves from the first step to the last step.</p>
+                </div>
+                <Button
+                  onClick={() => {
+                    setStageName("");
+                    setAddingStage(true);
+                  }}
+                >
+                  Add stage
+                </Button>
               </div>
               <ol className="mt-3 space-y-2">
                 {stages
                   .slice()
                   .sort((a, b) => a.sequence - b.sequence)
-                  .map((stage) => (
+                  .map((stage, index, ordered) => {
+                    const active = activeInOrder(ordered);
+                    const isLast = stage.is_active && active.at(-1)?.id === stage.id;
+                    const isFirst = stage.is_active && active[0]?.id === stage.id;
+                    return (
                     <li key={stage.id} className="rounded-lg border border-line p-3 text-sm">
                       <div className="flex flex-wrap items-center justify-between gap-2">
                         <div>
                           <span className="font-medium">
-                            {stage.sequence}. {stage.name}
+                            Step {index + 1}. {stage.name}
                           </span>
                           <span className="ml-2 text-xs text-muted">
-                            {stage.is_initial ? "Initial" : ""}
-                            {stage.is_initial && stage.is_final ? " · " : ""}
-                            {stage.is_final ? "Final" : ""}
+                            {isFirst ? "Starts here" : ""}
+                            {isFirst && isLast ? " · " : ""}
+                            {isLast ? "Last step" : ""}
                           </span>
                           <ActiveBadge active={stage.is_active} />
                         </div>
                         <div className="flex flex-wrap gap-2">
                           <Button
                             variant="secondary"
-                            disabled={busy || stage.sequence <= 1}
-                            onClick={() => void patchStage(stage, { sequence: stage.sequence - 1 })}
+                            disabled={busy || index === 0}
+                            onClick={() => void moveStage(stage, -1)}
                           >
-                            Up
+                            Move up
                           </Button>
                           <Button
                             variant="secondary"
-                            disabled={busy}
-                            onClick={() => void patchStage(stage, { sequence: stage.sequence + 1 })}
+                            disabled={busy || index === ordered.length - 1}
+                            onClick={() => void moveStage(stage, 1)}
                           >
-                            Down
+                            Move down
                           </Button>
-                          {!stage.is_initial ? (
-                            <Button variant="secondary" disabled={busy} onClick={() => void patchStage(stage, { is_initial: true })}>
-                              Make initial
-                            </Button>
-                          ) : null}
-                          {!stage.is_final ? (
-                            <Button variant="secondary" disabled={busy} onClick={() => void patchStage(stage, { is_final: true })}>
-                              Make final
-                            </Button>
-                          ) : null}
                           {stage.is_active ? (
                             <Button variant="danger" disabled={busy} onClick={() => void deactivateStage(stage)}>
-                              Deactivate
+                              Hide
                             </Button>
                           ) : (
-                            <Button variant="secondary" disabled={busy} onClick={() => void patchStage(stage, { is_active: true })}>
-                              Reactivate
+                            <Button
+                              variant="secondary"
+                              disabled={busy}
+                              onClick={() => {
+                                void (async () => {
+                                  setBusy(true);
+                                  setError("");
+                                  try {
+                                    await stagesApi.update(stage.id, { is_active: true });
+                                    if (selected) {
+                                      const listed = await reloadStages(selected.id);
+                                      await makeFirstAndLast(listed);
+                                      await reloadStages(selected.id);
+                                    }
+                                    toast("Stage restored");
+                                  } catch (err) {
+                                    setError(errorMessage(err));
+                                  } finally {
+                                    setBusy(false);
+                                  }
+                                })();
+                              }}
+                            >
+                              Restore
                             </Button>
                           )}
                         </div>
                       </div>
                     </li>
-                  ))}
+                    );
+                  })}
               </ol>
-              {stages.length === 0 ? <p className="mt-3 text-sm text-muted">No stages yet. The first stage should be both initial and final.</p> : null}
+              {stages.length === 0 ? (
+                <p className="mt-3 text-sm text-muted">No steps yet. Add the first stage for this type of print job.</p>
+              ) : null}
             </Card>
           ) : null}
         </div>
@@ -311,21 +367,26 @@ export default function CategoriesPage() {
         </Modal>
       ) : null}
       {addingStage ? (
-        <Modal title="Add stage" onClose={() => setAddingStage(false)} onSubmit={saveStage} busy={busy}>
-          <Field label="Name">
-            <Input required value={stageName} onChange={(event) => setStageName(event.target.value)} />
+        <Modal
+          title="Add stage"
+          onClose={() => setAddingStage(false)}
+          onSubmit={saveStage}
+          busy={busy}
+          submitLabel="Add stage"
+        >
+          <Field label="Stage name">
+            <Input
+              required
+              value={stageName}
+              onChange={(event) => setStageName(event.target.value)}
+              placeholder="For example: Printing, Lamination, Delivery"
+            />
           </Field>
-          <Field label="Sequence" hint="Leave blank to append.">
-            <Input type="number" min={1} value={sequence} onChange={(event) => setSequence(event.target.value)} />
-          </Field>
-          <label className="flex items-center gap-2 text-sm">
-            <input type="checkbox" checked={isInitial} onChange={(event) => setIsInitial(event.target.checked)} />
-            Initial stage
-          </label>
-          <label className="flex items-center gap-2 text-sm">
-            <input type="checkbox" checked={isFinal} onChange={(event) => setIsFinal(event.target.checked)} />
-            Final stage
-          </label>
+          <p className="body-text text-muted">
+            {activeInOrder().length === 0
+              ? "This will be the only step for now, so work starts and finishes here. Add more stages later if needed."
+              : "This will be added at the end of the list and become the last step."}
+          </p>
         </Modal>
       ) : null}
     </div>

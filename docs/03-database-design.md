@@ -13,11 +13,14 @@
 - Prefer deactivation over deleting records referenced by jobs or history.
 - Exact field lengths/defaults may be adjusted for implementation quality, but business semantics and relationships require approval to change.
 
+
+
 ## 2. `users`
 
 Purpose: owner/Admin and staff directory, role and active status.
 
 Proposed columns:
+
 - `id UUID PRIMARY KEY`
 - `display_name VARCHAR(150) NOT NULL`
 - `username VARCHAR(100) NOT NULL UNIQUE`
@@ -34,6 +37,7 @@ The dropdown displays active users. User deactivation must not delete their hist
 ## 3. `customers`
 
 Proposed columns:
+
 - `id UUID PRIMARY KEY`
 - `name VARCHAR(200) NOT NULL`
 - `phone VARCHAR(40) NOT NULL`
@@ -49,6 +53,7 @@ Phone is text, not numeric. Do not require phone to be globally unique unless th
 ## 4. `print_categories`
 
 Proposed columns:
+
 - `id UUID PRIMARY KEY`
 - `name VARCHAR(120) NOT NULL`
 - `description TEXT NULL`
@@ -61,6 +66,7 @@ Avoid duplicate active category names using an appropriate uniqueness rule. Deac
 ## 5. `workflow_stages`
 
 Proposed columns:
+
 - `id UUID PRIMARY KEY`
 - `category_id UUID NOT NULL REFERENCES print_categories(id)`
 - `name VARCHAR(120) NOT NULL`
@@ -78,6 +84,7 @@ A referenced stage must not be hard-deleted. Deactivate it instead. Reordering m
 ## 6. `jobs`
 
 Proposed columns:
+
 - `id UUID PRIMARY KEY`
 - `job_number VARCHAR(40) NOT NULL UNIQUE`
 - `customer_id UUID NOT NULL REFERENCES customers(id)`
@@ -109,6 +116,7 @@ Clarify whether a job number is sequential/human-readable or generated with a sa
 ## 7. `payments`
 
 Proposed columns:
+
 - `id UUID PRIMARY KEY`
 - `job_id UUID NOT NULL REFERENCES jobs(id)`
 - `amount NUMERIC(12,2) NOT NULL CHECK (amount > 0)`
@@ -121,6 +129,7 @@ Proposed columns:
 Payment methods should support at least cash, UPI and bank transfer; decide whether values are an enum or validated strings based on the API contract. Multiple payments per job are expected.
 
 Total paid is the sum of valid payment records. Outstanding balance is `final_amount - total_paid`. Payment status is derived:
+
 - `UNPAID` when total paid is zero.
 - `PARTIALLY_PAID` when total paid is greater than zero and less than the amount due.
 - `PAID` when total paid equals the amount due.
@@ -130,6 +139,7 @@ Before implementing overpayment, refunds, voiding or payment corrections, ask fo
 ## 8. `job_status_history`
 
 Proposed columns:
+
 - `id UUID PRIMARY KEY`
 - `job_id UUID NOT NULL REFERENCES jobs(id)`
 - `from_stage_id UUID NULL REFERENCES workflow_stages(id)`
@@ -152,9 +162,12 @@ The first production-stage assignment may have a null `from_stage_id`. History i
 - `jobs 1 ── many job_status_history`
 - `users 1 ── many job_status_history` through selected attribution user
 
+
+
 ## 10. Indexes
 
 At minimum, evaluate indexes for:
+
 - Foreign keys and commonly joined identifiers.
 - `jobs.job_number` (unique).
 - `jobs.customer_id`, `jobs.category_id`, `jobs.lead_status`, `jobs.current_stage_id`.
@@ -174,6 +187,8 @@ Avoid adding indexes without considering query patterns and write costs.
 - Define deletion restrictions and return clear API errors.
 - Stage deactivation must not break historical displays. For jobs currently on a deactivated stage, do not silently rewrite history; require a deliberate valid transition or a documented migration of current state.
 
+
+
 ## 12. Transaction and concurrency requirements
 
 - Update job stage and insert history atomically.
@@ -181,6 +196,8 @@ Avoid adding indexes without considering query patterns and write costs.
 - Validate category/stage compatibility inside the transaction.
 - Payment creation must not be double-counted on retries. Add idempotency only with a documented API design.
 - Generate job numbers without race conditions.
+
+
 
 ## 13. Mermaid ER diagram
 
@@ -195,6 +212,10 @@ erDiagram
     USERS ||--o{ JOB_STATUS_HISTORY : attributed_to
 ```
 
+
+
+
+
 ## 14. Migration plan
 
 1. Create the initial migration for all seven core tables and indexes.
@@ -204,15 +225,20 @@ erDiagram
 5. Never edit an applied migration; create a new migration for later changes.
 6. Never automatically reset a developer's or production database.
 
+
+
 ## 15. Decisions requiring confirmation before affected code
 
 Ask for clarification if not specified elsewhere:
+
 - Authentication/session design for the shared system and Admin-only staff creation.
 - Job number format.
 - Whether final amount can change after payments exist and how corrections are audited.
 - Overpayment/refund/void policy.
 - Exact rules when a workflow stage is deactivated while jobs reference it.
 - Whether jobs can be reopened after `LOST`, `CANCELLED` or `CONFIRMED`.
+
+
 
 ## 16. Phase 2 implementation notes
 
@@ -231,6 +257,8 @@ These notes record how the approved schema is enforced. They do not change busin
 - `password_hash` is `VARCHAR(255)`.
 - Payment methods are stored as `VARCHAR(40)` rather than a closed database enum, so additional configured methods do not require a schema change.
 
+
+
 ### Service-layer enforcement (later phases)
 
 The following cannot be fully enforced by this schema and must be validated by the service layer:
@@ -243,3 +271,4 @@ The following cannot be fully enforced by this schema and must be validated by t
 - Job-number generation without `MAX(job_number) + 1`. Phase 5 generates `MW-YYYYMMDD-XXXXXXXX`.
 - Concurrent stage updates (expected current stage or equivalent). A version column was not added because it is not in the approved schema. Phase 5 uses optional `expected_current_stage_id`.
 - Payment-method allow-list, overpayment/refund policy, and idempotency. Phase 6 allows `CASH`, `UPI` and `BANK_TRANSFER`, rejects overpayment with `409`, and does not implement refunds, voids or idempotency keys.
+

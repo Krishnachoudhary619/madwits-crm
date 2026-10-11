@@ -144,7 +144,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             );
           })}
         </nav>
-        <div className="border-t border-white/10 p-4">
+        <div className="border-t border-white/10 p-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
           <div className="text-sm font-medium">{user.display_name}</div>
           <div className="meta-text text-white/55">
             {user.username} · {user.role === "ADMIN" ? "Admin" : "Staff"}
@@ -155,7 +155,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </div>
       </aside>
       <div className="min-w-0 lg:pl-72">
-        <main id="main" className="mx-auto max-w-7xl px-4 py-5 sm:px-6 sm:py-6 lg:px-8 lg:py-8">
+        <main
+          id="main"
+          className="mx-auto max-w-7xl px-4 py-5 sm:px-6 sm:py-6 lg:px-8 lg:py-8"
+          style={{ paddingBottom: "max(1.25rem, env(safe-area-inset-bottom))" }}
+        >
           {children}
         </main>
       </div>

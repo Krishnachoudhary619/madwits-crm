@@ -158,7 +158,7 @@ export default function JobDetailPage() {
               {customer?.phone ? <div className="font-normal text-muted">{customer.phone}</div> : null}
             </Detail>
             <Detail label="Print category">{category?.name}</Detail>
-            <Detail label="Lifecycle">
+            <Detail label="Order status">
               <LeadBadge status={job.lead_status} />
             </Detail>
             <Detail label="Quantity">{job.quantity}</Detail>

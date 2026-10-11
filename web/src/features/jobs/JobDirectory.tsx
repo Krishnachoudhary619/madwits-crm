@@ -56,6 +56,8 @@ export function JobDirectory({
   const [stageId, setStageId] = useState(params.get("current_stage_id") ?? "");
   const [from, setFrom] = useState(params.get("created_from") ?? "");
   const [to, setTo] = useState(params.get("created_to") ?? "");
+  const [dueFrom, setDueFrom] = useState(params.get("due_from") ?? "");
+  const [dueTo, setDueTo] = useState(params.get("due_to") ?? "");
   const [overdue, setOverdue] = useState(params.get("follow_up_overdue") === "true");
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
@@ -92,6 +94,8 @@ export function JobDirectory({
           current_stage_id: stageId || undefined,
           created_from: dateToIsoStart(from),
           created_to: dateToIsoEnd(to),
+          due_from: dateToIsoStart(dueFrom),
+          due_to: dateToIsoEnd(dueTo),
           follow_up_overdue: overdue || undefined,
           page,
           page_size: 20,
@@ -111,7 +115,7 @@ export function JobDirectory({
     return () => {
       cancelled = true;
     };
-  }, [q, status, customerId, categoryId, stageId, from, to, overdue, page, mode]);
+  }, [q, status, customerId, categoryId, stageId, from, to, dueFrom, dueTo, overdue, page, mode]);
 
   return (
     <div>
@@ -205,6 +209,28 @@ export function JobDirectory({
               Clear customer filter
             </button>
           </p>
+        ) : null}
+        {mode === "jobs" ? (
+          <div className="mt-3 grid gap-3 sm:grid-cols-2">
+            <Input
+              type="date"
+              aria-label="Due from"
+              value={dueFrom}
+              onChange={(event) => {
+                setPage(1);
+                setDueFrom(event.target.value);
+              }}
+            />
+            <Input
+              type="date"
+              aria-label="Due to"
+              value={dueTo}
+              onChange={(event) => {
+                setPage(1);
+                setDueTo(event.target.value);
+              }}
+            />
+          </div>
         ) : null}
         {mode === "jobs" ? (
           <label className="mt-3 flex min-h-11 items-center gap-2 body-text text-charcoal">
