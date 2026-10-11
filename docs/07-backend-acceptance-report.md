@@ -152,7 +152,8 @@ Documented in `docs/04-api-contract.md` and related notes during implementation 
 
 - Job numbers use unique `MW-YYYYMMDD-XXXXXXXX` rather than sequential `MAX + 1`.
 - Shop dashboard calendar uses `SHOP_TIMEZONE` (default `Asia/Kolkata`).
-- Payments allowed only on `CONFIRMED` jobs; amount due is `final_amount`.
+- Payments allowed on `CONFIRMED` and `COMPLETED` jobs; amount due is `final_amount`.
+- Reaching the category final production stage sets order status to `COMPLETED`.
 - Reopen after `LOST`/`CANCELLED` is not implemented.
 - Overpayments and refunds are not accepted.
 

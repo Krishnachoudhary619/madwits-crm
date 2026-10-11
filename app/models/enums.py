@@ -11,6 +11,7 @@ class LeadStatus(StrEnum):
     QUOTATION_PREPARED = "QUOTATION_PREPARED"
     AWAITING_CONFIRMATION = "AWAITING_CONFIRMATION"
     CONFIRMED = "CONFIRMED"
+    COMPLETED = "COMPLETED"
     LOST = "LOST"
     CANCELLED = "CANCELLED"
 
@@ -45,10 +46,14 @@ LEAD_STATUS_TRANSITIONS: dict[LeadStatus, frozenset[LeadStatus]] = {
             LeadStatus.CANCELLED,
         }
     ),
-    LeadStatus.CONFIRMED: frozenset({LeadStatus.CANCELLED}),
+    LeadStatus.CONFIRMED: frozenset({LeadStatus.COMPLETED, LeadStatus.CANCELLED}),
+    LeadStatus.COMPLETED: frozenset({LeadStatus.CONFIRMED, LeadStatus.CANCELLED}),
     LeadStatus.LOST: frozenset(),
     LeadStatus.CANCELLED: frozenset(),
 }
+
+BILLABLE_LEAD_STATUSES = frozenset({LeadStatus.CONFIRMED, LeadStatus.COMPLETED})
+ORDER_LEAD_STATUS_VALUES = tuple(status.value for status in BILLABLE_LEAD_STATUSES)
 
 class PaymentStatus(StrEnum):
     UNPAID = "UNPAID"

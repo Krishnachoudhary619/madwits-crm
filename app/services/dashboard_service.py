@@ -7,7 +7,15 @@ from sqlalchemy.orm import Session
 from app.core.config import get_settings
 from app.core.dates import day_bounds, inclusive_period, shop_today, shop_zone
 from app.core.money import as_money, as_rate, format_money
-from app.models import Job, JobStatusHistory, LeadStatus, Payment, PrintCategory, WorkflowStage
+from app.models import (
+    ORDER_LEAD_STATUS_VALUES,
+    Job,
+    JobStatusHistory,
+    LeadStatus,
+    Payment,
+    PrintCategory,
+    WorkflowStage,
+)
 
 OPEN_INQUIRY_STATUSES = (
     LeadStatus.NEW_INQUIRY.value,
@@ -51,9 +59,12 @@ def _in_production_clause():
 
 
 def _completed_clause():
-    return and_(
-        Job.lead_status == LeadStatus.CONFIRMED.value,
-        WorkflowStage.is_final.is_(True),
+    return or_(
+        Job.lead_status == LeadStatus.COMPLETED.value,
+        and_(
+            Job.lead_status == LeadStatus.CONFIRMED.value,
+            WorkflowStage.is_final.is_(True),
+        ),
     )
 
 
@@ -74,8 +85,7 @@ def _completed_in_period_count(db: Session, start, end) -> int:
         .join(WorkflowStage, Job.current_stage_id == WorkflowStage.id)
         .join(completion_times, completion_times.c.job_id == Job.id)
         .where(
-            Job.lead_status == LeadStatus.CONFIRMED.value,
-            WorkflowStage.is_final.is_(True),
+            _completed_clause(),
             completion_times.c.completed_at >= start,
             completion_times.c.completed_at < end,
         )
@@ -108,7 +118,7 @@ def summary(db: Session, *, from_date: date | None, to_date: date | None) -> dic
         .select_from(Job)
         .outerjoin(paid_subq, paid_subq.c.job_id == Job.id)
         .where(
-            Job.lead_status == LeadStatus.CONFIRMED.value,
+            Job.lead_status.in_(ORDER_LEAD_STATUS_VALUES),
             Job.final_amount.is_not(None),
         ),
     )
@@ -140,7 +150,7 @@ def summary(db: Session, *, from_date: date | None, to_date: date | None) -> dic
         db,
         Job.created_at >= start,
         Job.created_at < end,
-        Job.lead_status == LeadStatus.CONFIRMED.value,
+        Job.lead_status.in_(ORDER_LEAD_STATUS_VALUES),
     )
     return {
         "period": period,
@@ -218,7 +228,7 @@ def jobs_by_category(db: Session) -> list[dict]:
             PrintCategory.id,
             PrintCategory.name,
             func.count(Job.id),
-            func.count(case((Job.lead_status == LeadStatus.CONFIRMED.value, Job.id))),
+            func.count(case((Job.lead_status.in_(ORDER_LEAD_STATUS_VALUES), Job.id))),
             func.count(case((_in_production_clause(), Job.id))),
             func.count(case((_completed_clause(), Job.id))),
         )

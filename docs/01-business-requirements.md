@@ -97,12 +97,15 @@ The lifecycle is distinct from the production stage. The initial status set shou
 - `QUOTATION_PREPARED`
 - `AWAITING_CONFIRMATION`
 - `CONFIRMED`
+- `COMPLETED`
 - `LOST`
 - `CANCELLED`
 
 The allowed transitions must be implemented and documented in the API contract. A quotation not accepted by the customer must not enter production.
 
-When confirmed, the existing job becomes an order and is assigned the configured initial production stage for its category. Lost and cancelled jobs remain available for historical reporting. Notes/reasons for lost inquiries should be recordable.
+When confirmed, the existing job becomes an order and is assigned the configured initial production stage for its category. When production reaches the category's final stage, the existing job's order status becomes `COMPLETED`. Moving the job off the final stage returns it to `CONFIRMED`. Payments may still be recorded on completed orders. Lost and cancelled jobs remain available for historical reporting. Notes/reasons for lost inquiries should be recordable.
+
+A completed order can generate a bill PDF (shop name, customer, stationery/category, amount, paid and balance) for WhatsApp share. This uses the device share sheet or WhatsApp text; it is not a WhatsApp Business API integration.
 
 ## 8. Dynamic production workflows
 

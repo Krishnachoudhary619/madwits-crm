@@ -372,6 +372,7 @@ def test_stage_moves_follow_category_workflow(
     )
     assert to_final.status_code == 200, to_final.text
     assert to_final.json()["current_stage_id"] == by_name["Completed"]["id"]
+    assert to_final.json()["lead_status"] == LeadStatus.COMPLETED.value
 
     history = api_client.get(f"/api/v1/jobs/{job['id']}/history", headers=headers).json()
     assert [item["to_stage_id"] for item in history] == [
@@ -382,6 +383,18 @@ def test_stage_moves_follow_category_workflow(
     assert history[1]["from_stage_id"] == by_name["Designing"]["id"]
     assert history[1]["updated_by_user_id"] == str(attributed.id)
     assert history[1]["notes"] == "Sent to press"
+
+    back = api_client.post(
+        f"/api/v1/jobs/{job['id']}/stage",
+        headers=headers,
+        json={
+            "to_stage_id": by_name["Laminating"]["id"],
+            "updated_by_user_id": str(attributed.id),
+        },
+    )
+    assert back.status_code == 200, back.text
+    assert back.json()["lead_status"] == LeadStatus.CONFIRMED.value
+    assert back.json()["current_stage_id"] == by_name["Laminating"]["id"]
 
 
 def test_inactive_attribution_is_rejected_without_history(

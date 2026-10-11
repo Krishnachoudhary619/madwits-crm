@@ -7,6 +7,7 @@ const leadStyles: Record<LeadStatus, string> = {
   QUOTATION_PREPARED: "bg-violet-50 text-violet-900 ring-violet-200",
   AWAITING_CONFIRMATION: "bg-amber-50 text-amber-950 ring-amber-200",
   CONFIRMED: "bg-emerald-50 text-emerald-900 ring-emerald-200",
+  COMPLETED: "bg-teal-50 text-teal-900 ring-teal-200",
   LOST: "bg-slate-100 text-slate-800 ring-slate-300",
   CANCELLED: "bg-rose-50 text-rose-900 ring-rose-200",
 };

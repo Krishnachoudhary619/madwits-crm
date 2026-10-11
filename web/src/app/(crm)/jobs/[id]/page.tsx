@@ -8,7 +8,7 @@ import { formatDate, formatDateTime } from "@/lib/dates";
 import { errorMessage } from "@/lib/errors";
 import { specText } from "@/lib/jobs";
 import { formatInr } from "@/lib/money";
-import { canRecordPayment } from "@/lib/lifecycle";
+import { canRecordPayment, canSendBill } from "@/lib/lifecycle";
 import type {
   AttributionOption,
   Customer,
@@ -23,6 +23,7 @@ import { Button, Card, ErrorBanner, PageHeader, Spinner } from "@/components/ui"
 import { LeadBadge, PaymentBadge } from "@/components/StatusBadge";
 import { JobForm } from "@/features/jobs/JobForm";
 import { JobActions, PaymentModal } from "@/features/jobs/JobActions";
+import { SendBillButton } from "@/features/jobs/SendBillButton";
 import { useToast } from "@/components/Toast";
 
 function Detail({ label, children }: { label: string; children: React.ReactNode }) {
@@ -115,6 +116,9 @@ export default function JobDetailPage() {
             <Button variant="secondary" onClick={() => setEditing(true)}>
               Edit job
             </Button>
+            {canSendBill(job.lead_status) ? (
+              <SendBillButton job={job} customer={customer} category={category} balance={balance} />
+            ) : null}
             {canRecordPayment(job.lead_status) ? (
               <Button onClick={() => setPaying(true)}>Record payment</Button>
             ) : null}

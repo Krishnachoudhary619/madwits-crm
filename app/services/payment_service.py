@@ -6,7 +6,13 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.core.money import ZERO_MONEY, as_money
-from app.models import PAYMENT_METHODS, Job, LeadStatus, Payment, PaymentStatus
+from app.models import (
+    ORDER_LEAD_STATUS_VALUES,
+    PAYMENT_METHODS,
+    Job,
+    Payment,
+    PaymentStatus,
+)
 from app.services.exceptions import (
     InvalidPaymentMethodError,
     OverpaymentError,
@@ -25,7 +31,7 @@ def total_paid_for_job(db: Session, job_id: UUID) -> Decimal:
 
 
 def amount_due_for_job(job: Job) -> Decimal:
-    if job.lead_status != LeadStatus.CONFIRMED.value:
+    if job.lead_status not in ORDER_LEAD_STATUS_VALUES:
         return ZERO_MONEY
     return as_money(job.final_amount)
 
@@ -44,7 +50,7 @@ def derive_payment_status(amount_due: Decimal, total_paid: Decimal) -> PaymentSt
 
 def job_balance(db: Session, job: Job) -> dict[str, Decimal | PaymentStatus]:
     paid = total_paid_for_job(db, job.id)
-    if job.lead_status != LeadStatus.CONFIRMED.value:
+    if job.lead_status not in ORDER_LEAD_STATUS_VALUES:
         return {
             "amount_due": ZERO_MONEY,
             "total_paid": paid,
@@ -70,9 +76,9 @@ def create_payment(
     reference_number: str | None = None,
     notes: str | None = None,
 ) -> Payment:
-    if job.lead_status != LeadStatus.CONFIRMED.value:
+    if job.lead_status not in ORDER_LEAD_STATUS_VALUES:
         raise PaymentNotAllowedError(
-            "Payments can be recorded only on confirmed jobs."
+            "Payments can be recorded only on confirmed or completed jobs."
         )
     method = payment_method.strip().upper()
     if method not in PAYMENT_METHODS:

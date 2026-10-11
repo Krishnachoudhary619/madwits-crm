@@ -395,6 +395,9 @@ def confirm_job(
         attribution_user_id=attribution_user_id,
         notes=notes,
     )
+    if initial.is_final:
+        _transition(job, LeadStatus.COMPLETED)
+    db.flush()
     db.refresh(job)
     return job
 
@@ -426,9 +429,12 @@ def update_job_stage(
     notes: str | None = None,
     expected_current_stage_id: UUID | None = None,
 ) -> Job:
-    if job.lead_status != LeadStatus.CONFIRMED.value:
+    if job.lead_status not in {
+        LeadStatus.CONFIRMED.value,
+        LeadStatus.COMPLETED.value,
+    }:
         raise InvalidStageTransitionError(
-            "Production stages can be updated only on confirmed jobs."
+            "Production stages can be updated only on confirmed or completed jobs."
         )
     if (
         expected_current_stage_id is not None
@@ -459,6 +465,11 @@ def update_job_stage(
         attribution_user_id=attribution_user_id,
         notes=notes,
     )
+    if target.is_final:
+        _transition(job, LeadStatus.COMPLETED)
+    elif job.lead_status == LeadStatus.COMPLETED.value:
+        _transition(job, LeadStatus.CONFIRMED)
+    db.flush()
     db.refresh(job)
     return job
 

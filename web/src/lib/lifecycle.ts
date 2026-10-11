@@ -5,6 +5,7 @@ export const LEAD_LABELS: Record<LeadStatus, string> = {
   QUOTATION_PREPARED: "Quotation prepared",
   AWAITING_CONFIRMATION: "Waiting for customer",
   CONFIRMED: "Confirmed",
+  COMPLETED: "Completed",
   LOST: "Lost",
   CANCELLED: "Cancelled",
 };
@@ -40,14 +41,19 @@ export function canCancel(status: LeadStatus): boolean {
     status === "NEW_INQUIRY" ||
     status === "QUOTATION_PREPARED" ||
     status === "AWAITING_CONFIRMATION" ||
-    status === "CONFIRMED"
+    status === "CONFIRMED" ||
+    status === "COMPLETED"
   );
 }
 
 export function canChangeStage(status: LeadStatus): boolean {
-  return status === "CONFIRMED";
+  return status === "CONFIRMED" || status === "COMPLETED";
 }
 
 export function canRecordPayment(status: LeadStatus): boolean {
-  return status === "CONFIRMED";
+  return status === "CONFIRMED" || status === "COMPLETED";
+}
+
+export function canSendBill(status: LeadStatus): boolean {
+  return status === "COMPLETED";
 }

@@ -75,7 +75,7 @@ export default function PaymentsPage() {
     const [summary, jobs] = await Promise.all([
       dashboardApi.summary(),
       jobsApi.list({
-        lead_status: ["CONFIRMED"],
+        lead_status: ["CONFIRMED", "COMPLETED"],
         page: outPage,
         page_size: 20,
         sort: "updated_at",

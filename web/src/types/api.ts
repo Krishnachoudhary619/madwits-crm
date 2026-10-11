@@ -3,6 +3,7 @@ export type LeadStatus =
   | "QUOTATION_PREPARED"
   | "AWAITING_CONFIRMATION"
   | "CONFIRMED"
+  | "COMPLETED"
   | "LOST"
   | "CANCELLED";
 

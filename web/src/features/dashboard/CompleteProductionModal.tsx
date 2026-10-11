@@ -46,8 +46,8 @@ export function CompleteProductionModal({
     <Modal title="Mark production complete" onClose={onClose} onSubmit={submit} busy={busy} submitLabel="Mark complete">
       {error ? <ErrorBanner message={error} /> : null}
       <p className="body-text text-muted">
-        This moves {job.job_number} to the category&apos;s final stage <strong>{finalStage.name}</strong> using the
-        existing stage-change API. It does not record delivery or payment.
+        This moves {job.job_number} to the final stage <strong>{finalStage.name}</strong> and sets the order status
+        to Completed. You can send the bill from the job page afterwards. It does not record payment.
       </p>
       <AttributionSelect value={attribution} onChange={setAttribution} />
       <Field label="Notes">

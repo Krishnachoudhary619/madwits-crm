@@ -51,7 +51,7 @@ class Job(Base):
         CheckConstraint(
             "lead_status IN ("
             "'NEW_INQUIRY', 'QUOTATION_PREPARED', 'AWAITING_CONFIRMATION', "
-            "'CONFIRMED', 'LOST', 'CANCELLED')",
+            "'CONFIRMED', 'COMPLETED', 'LOST', 'CANCELLED')",
             name="ck_jobs_lead_status",
         ),
         ForeignKeyConstraint(

@@ -105,7 +105,7 @@ Proposed columns:
 - `updated_at TIMESTAMPTZ NOT NULL`
 
 The proposed lifecycle values are:
-`NEW_INQUIRY`, `QUOTATION_PREPARED`, `AWAITING_CONFIRMATION`, `CONFIRMED`, `LOST`, `CANCELLED`.
+`NEW_INQUIRY`, `QUOTATION_PREPARED`, `AWAITING_CONFIRMATION`, `CONFIRMED`, `COMPLETED`, `LOST`, `CANCELLED`.
 
 The API/service layer must enforce allowed transitions. A confirmed job must have a valid initial/current production stage according to the approved transition policy. A job's `current_stage_id` must reference a stage belonging to its `category_id`; enforce this at service level and use stronger database constraints if practical.
 

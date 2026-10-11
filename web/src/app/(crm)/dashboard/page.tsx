@@ -122,7 +122,7 @@ export default function DashboardPage() {
           dashboardApi.paymentsSummary(from, to),
           dashboardApi.jobsByStage(),
           listAllJobs({ lead_status: OPEN_ENQUIRY_STATUSES, sort: "created_at", order: "desc" }),
-          listAllJobs({ lead_status: ["CONFIRMED"], sort: "due_date", order: "asc" }),
+          listAllJobs({ lead_status: ["CONFIRMED", "COMPLETED"], sort: "due_date", order: "asc" }),
         ]);
         if (cancelled) return;
         setTodaySummary(todaySum);
@@ -534,8 +534,8 @@ export default function DashboardPage() {
           <section id="completed-work" className="mt-8">
             <h2 className="section-title text-charcoal">Completed work</h2>
             <p className="mb-3 meta-text">
-              Production-complete jobs are confirmed jobs on their category&apos;s final stage. Completion time comes
-              from status history, not the job&apos;s created date.
+              Completed orders are jobs whose order status is Completed, or confirmed jobs already on the final
+              production stage. Completion time comes from status history, not the job&apos;s created date.
             </p>
             <div className="grid gap-4 lg:grid-cols-3">
               <ListCard

@@ -96,15 +96,16 @@ There is no completed-at column in the approved schema, so completed-date filter
 | `NEW_INQUIRY` | `QUOTATION_PREPARED`, `AWAITING_CONFIRMATION`, `LOST`, `CANCELLED` |
 | `QUOTATION_PREPARED` | `AWAITING_CONFIRMATION`, `CONFIRMED`, `LOST`, `CANCELLED` |
 | `AWAITING_CONFIRMATION` | `QUOTATION_PREPARED` (quotation revised), `CONFIRMED`, `LOST`, `CANCELLED` |
-| `CONFIRMED` | `CANCELLED` |
+| `CONFIRMED` | `COMPLETED`, `CANCELLED` |
+| `COMPLETED` | `CONFIRMED`, `CANCELLED` |
 | `LOST` | none |
 | `CANCELLED` | none |
 
-Reopening `LOST`, `CANCELLED` or `CONFIRMED` is not implemented. A quotation that has not been confirmed must not receive a production stage.
+`COMPLETED` is set automatically when a confirmed or completed job is moved onto the category's active final stage, including confirmation onto a stage that is both initial and final. Moving off that final stage returns the job to `CONFIRMED`. Reopening `LOST` or `CANCELLED` is not implemented. A quotation that has not been confirmed must not receive a production stage.
 
 ### Production-stage rules
 
-Confirmed jobs may move to the previous or next *active* stage in the job's category workflow, or directly to that category's active final stage. Cross-category stages, inactive stages, unconfirmed jobs and skipped intermediate non-final stages are rejected with `409`.
+Confirmed and completed jobs may move to the previous or next *active* stage in the job's category workflow, or directly to that category's active final stage. Cross-category stages, inactive stages, unconfirmed jobs and skipped intermediate non-final stages are rejected with `409`.
 
 `updated_by_user_id` is the selected attribution person, not the authenticated operator. The backend validates that the selected user exists and is active. Invalid attribution returns `400` and writes no history. Job stage and history are committed in one transaction.
 
@@ -132,7 +133,7 @@ Concurrency: `POST /jobs/{job_id}/stage` accepts optional `expected_current_stag
 
 Admin and Staff may use all payment endpoints. There is no payment delete, void, refund or correction endpoint.
 
-- `POST /jobs/{job_id}/payments` — record a payment against a **confirmed** job.
+- `POST /jobs/{job_id}/payments` — record a payment against a **confirmed or completed** job.
 - `GET /jobs/{job_id}/payments` — payment history plus the derived balance snapshot.
 - `GET /jobs/{job_id}/balance` — amount due, total paid, outstanding balance and derived payment status.
 - `GET /payments` — filtered payment list (`job_id`, `payment_method`, `paid_from`, `paid_to`, pagination).
@@ -158,7 +159,7 @@ A payment that would make total paid exceed amount due is rejected with `409`. R
 Admin and Staff may use all dashboard endpoints. Calendar dates and "today" use `SHOP_TIMEZONE` (default `Asia/Kolkata`). Stored timestamps remain `TIMESTAMPTZ`. A requested date range is inclusive of both calendar dates in that timezone and is applied as `[start_at, end_at)`. When `from_date` and `to_date` are omitted, the period is the current shop-local month through today.
 
 - `GET /dashboard/summary` — snapshot pipeline metrics plus period metrics.
-- `GET /dashboard/jobs-by-stage` — confirmed jobs grouped by current active production stage (zero counts included).
+- `GET /dashboard/jobs-by-stage` — in-progress `CONFIRMED` jobs grouped by current active production stage (zero counts included). Completed orders are omitted.
 - `GET /dashboard/jobs-by-category` — job counts per print category, including confirmed / in-production / completed split.
 - `GET /dashboard/payments-summary` — payment totals in the requested period, including per-method breakdown.
 
@@ -171,10 +172,10 @@ Definitions:
 - Follow-ups due today: non-lost, non-cancelled jobs whose `next_follow_up_at` falls on the shop-local current date.
 - Follow-ups overdue: non-lost, non-cancelled jobs whose `next_follow_up_at` is before shop-local today.
 - In production: current `CONFIRMED` jobs whose current stage is missing or is not the category's final stage. Cancelled jobs are not counted (`CANCELLED` is a lifecycle status; reopen is not implemented).
-- Completed jobs in period: current `CONFIRMED` jobs on their category's final stage whose latest history row onto that stage falls in the requested period. There is no `completed_at` column.
-- Inquiry-to-confirmation conversion: jobs **created** in the requested period that are currently `CONFIRMED`, divided by jobs created in that period. The rate is a four-decimal decimal string. Jobs still open in the period remain in the denominator.
+- Completed jobs in period: current `COMPLETED` jobs, or `CONFIRMED` jobs still on their category's final stage, whose latest history row onto the current stage falls in the requested period. There is no `completed_at` column.
+- Inquiry-to-confirmation conversion: jobs **created** in the requested period that are currently `CONFIRMED` or `COMPLETED`, divided by jobs created in that period. The rate is a four-decimal decimal string. Jobs still open in the period remain in the denominator.
 - Payments received: sum of `payments.amount` whose `paid_at` is in the requested period.
-- Outstanding balance: sum of `final_amount - total paid` for current `CONFIRMED` jobs.
+- Outstanding balance: sum of `final_amount - total paid` for current `CONFIRMED` and `COMPLETED` jobs.
 
 Empty datasets return zeros and empty lists, not errors. Production status and payment status are independent.
 

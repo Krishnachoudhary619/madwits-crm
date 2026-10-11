@@ -50,7 +50,7 @@ def test_production_completion_is_independent_of_payment(
         },
     )
     assert completed.status_code == 200, completed.text
-    assert completed.json()["lead_status"] == LeadStatus.CONFIRMED.value
+    assert completed.json()["lead_status"] == LeadStatus.COMPLETED.value
     assert completed.json()["current_stage_id"] == by_name["Completed"]["id"]
     still_unpaid = api_client.get(
         f"/api/v1/jobs/{job['id']}/balance", headers=headers
@@ -69,7 +69,7 @@ def test_production_completion_is_independent_of_payment(
     assert paid.status_code == 201, paid.text
     after_pay = api_client.get(f"/api/v1/jobs/{job['id']}", headers=headers).json()
     assert after_pay["current_stage_id"] == by_name["Completed"]["id"]
-    assert after_pay["lead_status"] == LeadStatus.CONFIRMED.value
+    assert after_pay["lead_status"] == LeadStatus.COMPLETED.value
     assert (
         api_client.get(f"/api/v1/jobs/{job['id']}/balance", headers=headers).json()[
             "payment_status"
