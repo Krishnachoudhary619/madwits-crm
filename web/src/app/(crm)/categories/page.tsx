@@ -137,11 +137,13 @@ export default function CategoriesPage() {
     setError("");
     try {
       const firstStep = activeInOrder().length === 0;
-      await categoriesApi.addStage(selected.id, {
+      const created = await categoriesApi.addStage(selected.id, {
         name: stageName.trim(),
-        is_initial: firstStep,
-        is_final: true,
+        ...(firstStep ? { is_initial: true, is_final: true } : {}),
       });
+      if (!firstStep) {
+        await stagesApi.update(created.id, { is_final: true });
+      }
       toast("Stage added");
       setAddingStage(false);
       setStageName("");

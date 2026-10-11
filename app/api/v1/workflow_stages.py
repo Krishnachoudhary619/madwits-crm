@@ -1,6 +1,7 @@
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user
@@ -53,6 +54,12 @@ def patch(
     ) as exc:
         db.rollback()
         raise _conflict(exc) from exc
+    except IntegrityError as exc:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="This stage conflicts with another stage in the category.",
+        ) from exc
 
 
 @router.post("/{stage_id}/deactivate", response_model=WorkflowStagePublic)

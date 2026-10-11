@@ -1,6 +1,6 @@
 from uuid import UUID
 
-from sqlalchemy import func, select, text
+from sqlalchemy import func, select, text, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -73,10 +73,25 @@ def next_sequence(db: Session, category_id: UUID) -> int:
 def _clear_flag(
     db: Session, category_id: UUID, *, flag: str, except_id: UUID
 ) -> None:
-    stages = list_active_stages(db, category_id)
-    for stage in stages:
-        if stage.id != except_id and getattr(stage, flag):
-            setattr(stage, flag, False)
+    if flag not in {"is_initial", "is_final"}:
+        raise ValueError(f"Unsupported workflow flag: {flag}")
+    db.execute(
+        update(WorkflowStage)
+        .where(
+            WorkflowStage.category_id == category_id,
+            WorkflowStage.is_active.is_(True),
+            WorkflowStage.id != except_id,
+            getattr(WorkflowStage, flag).is_(True),
+        )
+        .values(**{flag: False})
+    )
+    for obj in list(db.identity_map.values()):
+        if (
+            isinstance(obj, WorkflowStage)
+            and obj.category_id == category_id
+            and obj.id != except_id
+        ):
+            db.expire(obj, [flag])
     db.flush()
 
 
