@@ -1,6 +1,6 @@
 import { cookies } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
-import { apiOrigin, TOKEN_COOKIE, TOKEN_MAX_AGE } from "@/lib/auth/cookies";
+import { apiOrigin, cookieSecure, TOKEN_COOKIE, TOKEN_MAX_AGE } from "@/lib/auth/cookies";
 
 export async function POST(request: NextRequest) {
   const payload = await request.json();
@@ -31,7 +31,7 @@ export async function POST(request: NextRequest) {
   (await cookies()).set(TOKEN_COOKIE, tokenBody.access_token, {
     httpOnly: true,
     sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
+    secure: cookieSecure(),
     path: "/",
     maxAge: TOKEN_MAX_AGE,
   });

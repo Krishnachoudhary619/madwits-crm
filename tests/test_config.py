@@ -55,6 +55,46 @@ def test_invalid_shop_timezone_fails(monkeypatch: pytest.MonkeyPatch) -> None:
         )
 
 
+def test_production_rejects_placeholder_jwt_secret(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    with pytest.raises(ValidationError):
+        Settings(
+            _env_file=None,
+            app_env="production",
+            postgres_user="madweb",
+            postgres_password="unique-production-db-password",
+            postgres_db="madweb_crm",
+            jwt_secret="change-me-to-a-long-random-secret",
+        )
+
+
+def test_production_rejects_placeholder_database_password(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    with pytest.raises(ValidationError):
+        Settings(
+            _env_file=None,
+            app_env="production",
+            postgres_user="madweb",
+            postgres_password="change-me",
+            postgres_db="madweb_crm",
+            jwt_secret="unique-production-jwt-secret-value-32",
+        )
+
+
+def test_production_accepts_unique_secrets(monkeypatch: pytest.MonkeyPatch) -> None:
+    settings = Settings(
+        _env_file=None,
+        app_env="production",
+        postgres_user="madweb",
+        postgres_password="unique-production-db-password",
+        postgres_db="madweb_crm",
+        jwt_secret="unique-production-jwt-secret-value-32",
+    )
+    assert settings.app_env == "production"
+
+
 def test_database_url_override_wins(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.delenv("POSTGRES_USER", raising=False)
     monkeypatch.delenv("POSTGRES_PASSWORD", raising=False)

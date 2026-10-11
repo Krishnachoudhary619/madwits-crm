@@ -1,4 +1,8 @@
 .env
+.env.production
+!.env.production.example
+backups/
+*.dump
 .venv/
 venv/
 __pycache__/

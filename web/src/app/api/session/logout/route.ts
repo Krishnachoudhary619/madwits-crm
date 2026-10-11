@@ -10,7 +10,7 @@ export async function POST(request: NextRequest) {
       await proxyToBackend(request, "/api/v1/auth/logout", { token });
     }
   } finally {
-    (await cookies()).delete(TOKEN_COOKIE);
+    (await cookies()).delete({ name: TOKEN_COOKIE, path: "/" });
   }
   return new NextResponse(null, { status: 204 });
 }

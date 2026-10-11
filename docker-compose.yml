@@ -15,7 +15,9 @@ services:
       start_period: 10s
 
   api:
-    build: .
+    build:
+      context: .
+      target: development
     depends_on:
       postgres:
         condition: service_healthy
@@ -30,6 +32,7 @@ services:
       JWT_SECRET: ${JWT_SECRET}
       JWT_EXPIRE_MINUTES: ${JWT_EXPIRE_MINUTES:-720}
       SHOP_TIMEZONE: ${SHOP_TIMEZONE:-Asia/Kolkata}
+      RUN_MIGRATIONS: ${RUN_MIGRATIONS:-0}
     ports:
       - "${API_PORT:-8000}:8000"
 

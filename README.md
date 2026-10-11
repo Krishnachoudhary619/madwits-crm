@@ -103,6 +103,27 @@ npm run build
 
 Logout deletes the browser cookie and calls `POST /api/v1/auth/logout`. That does not revoke a JWT server-side; the token remains valid until it expires.
 
+## Production
+
+See `docs/08-production-deployment.md` for the full runbook.
+
+On the production host only:
+
+```bash
+cp .env.production.example .env
+# set unique POSTGRES_PASSWORD, JWT_SECRET, and COOKIE_SECURE
+docker compose -f docker-compose.prod.yml up -d --build
+```
+
+If this machine already has a development `.env`, use `--env-file .env.production` instead of overwriting it.
+
+- Shop UI: `http://<host>:3000` (put HTTPS in front for public internet use)
+- The API is not published; the web container calls it on the Docker network
+- Migrations run on API startup (`alembic upgrade head` only)
+- Backup: `./scripts/backup-postgres.sh`
+
+Never run `docker compose down -v` against a database you need to keep.
+
 ## Stack
 
 - Python 3.12

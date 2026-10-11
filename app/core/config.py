@@ -5,6 +5,19 @@ from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from sqlalchemy.engine import URL
 
+_PLACEHOLDER_SECRETS = {
+    "change-me",
+    "change-me-to-a-long-random-secret",
+    "replace-with-a-long-random-jwt-secret-value",
+    "test-jwt-secret-not-for-production",
+}
+_PLACEHOLDER_PASSWORDS = {
+    "change-me",
+    "postgres",
+    "password",
+    "replace-with-a-long-random-database-password",
+}
+
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
@@ -49,6 +62,18 @@ class Settings(BaseSettings):
             raise ValueError(
                 f"SHOP_TIMEZONE is not a valid IANA timezone: {self.shop_timezone}"
             ) from exc
+        if self.app_env == "production":
+            if self.jwt_secret.strip() in _PLACEHOLDER_SECRETS:
+                raise ValueError(
+                    "JWT_SECRET must be a unique production secret, not a placeholder."
+                )
+            if (
+                self.postgres_password
+                and self.postgres_password.strip() in _PLACEHOLDER_PASSWORDS
+            ):
+                raise ValueError(
+                    "POSTGRES_PASSWORD must not be a placeholder in production."
+                )
         return self
 
     @property

@@ -1,8 +1,12 @@
+import logging
+
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.status import HTTP_500_INTERNAL_SERVER_ERROR
+
+logger = logging.getLogger("madweb")
 
 
 def error_payload(code: str, message: str, details: list | None = None) -> dict:
@@ -59,8 +63,9 @@ def register_exception_handlers(app: FastAPI) -> None:
 
     @app.exception_handler(Exception)
     async def unhandled_exception_handler(
-        _request: Request, _exc: Exception
+        _request: Request, exc: Exception
     ) -> JSONResponse:
+        logger.exception("Unhandled application error", exc_info=exc)
         return JSONResponse(
             status_code=HTTP_500_INTERNAL_SERVER_ERROR,
             content=error_payload(

@@ -9,6 +9,7 @@
 - `docs/05-authorization-and-audit.md` defines authentication, authorization and attribution rules.
 - `docs/06-development-roadmap.md` defines implementation order and acceptance gates.
 - `docs/07-backend-acceptance-report.md` is the final verification report template.
+- `docs/08-production-deployment.md` is the production deploy and backup runbook.
 
 ## Change control
 1. Do not invent features or expand scope without approval.

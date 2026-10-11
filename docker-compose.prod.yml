@@ -1,0 +1,56 @@
+name: madweb-crm-prod
+
+services:
+  postgres:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+  api:
+    build:
+      context: .
+      target: runtime
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      APP_NAME: ${APP_NAME:-Madweb CRM}
+      APP_ENV: production
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: "5432"
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_EXPIRE_MINUTES: ${JWT_EXPIRE_MINUTES:-720}
+      SHOP_TIMEZONE: ${SHOP_TIMEZONE:-Asia/Kolkata}
+      RUN_MIGRATIONS: "1"
+
+  web:
+    build: ./web
+    restart: unless-stopped
+    depends_on:
+      api:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      API_INTERNAL_URL: http://api:8000
+      COOKIE_SECURE: ${COOKIE_SECURE:-true}
+    ports:
+      - "${WEB_PORT:-3000}:3000"
+
+volumes:
+  postgres_data:
+    name: madweb_crm_prod_postgres_data
