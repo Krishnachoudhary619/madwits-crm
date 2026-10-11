@@ -1,7 +1,7 @@
 import pytest
 from pydantic import ValidationError
 
-from app.core.config import Settings
+from app.core.config import Settings, normalize_database_url
 
 
 def test_missing_database_configuration_fails(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -93,6 +93,28 @@ def test_production_accepts_unique_secrets(monkeypatch: pytest.MonkeyPatch) -> N
         jwt_secret="unique-production-jwt-secret-value-32",
     )
     assert settings.app_env == "production"
+
+
+def test_render_database_url_uses_psycopg_and_ssl(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    assert normalize_database_url(
+        "postgres://demo:secret@dpg-abc123-a.oregon-postgres.render.com/madweb"
+    ) == (
+        "postgresql+psycopg://demo:secret@dpg-abc123-a.oregon-postgres.render.com"
+        "/madweb?sslmode=require"
+    )
+    monkeypatch.delenv("POSTGRES_USER", raising=False)
+    monkeypatch.delenv("POSTGRES_PASSWORD", raising=False)
+    monkeypatch.delenv("POSTGRES_DB", raising=False)
+    settings = Settings(
+        _env_file=None,
+        app_env="production",
+        database_url="postgres://demo:secret@dpg-abc123-a.oregon-postgres.render.com/madweb",
+        jwt_secret="unique-production-jwt-secret-value-32",
+    )
+    assert "postgresql+psycopg://" in settings.sqlalchemy_database_uri
+    assert "sslmode=require" in settings.sqlalchemy_database_uri
 
 
 def test_database_url_override_wins(monkeypatch: pytest.MonkeyPatch) -> None:

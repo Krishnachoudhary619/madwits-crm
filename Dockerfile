@@ -26,10 +26,9 @@ USER appuser
 EXPOSE 8000
 
 HEALTHCHECK --interval=10s --timeout=5s --retries=10 --start-period=20s \
-    CMD curl -fsS http://127.0.0.1:8000/health || exit 1
+    CMD-SHELL curl -fsS "http://127.0.0.1:${PORT:-8000}/health" || exit 1
 
 ENTRYPOINT ["/app/scripts/api-entrypoint.sh"]
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
 
 
 FROM runtime AS development
@@ -39,3 +38,6 @@ COPY tests ./tests
 RUN pip install --no-cache-dir --root-user-action=ignore -e ".[dev]" \
     && chown -R appuser:appuser /app
 USER appuser
+
+# Render Docker builds the last stage. Local compose still selects --target.
+FROM runtime

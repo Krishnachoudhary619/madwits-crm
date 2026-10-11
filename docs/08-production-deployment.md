@@ -123,3 +123,9 @@ docker compose -f docker-compose.prod.yml down
 - The API rejects placeholder `JWT_SECRET` and `POSTGRES_PASSWORD` values when `APP_ENV=production`
 - Staff-management remains Admin-only; attribution is not authorization
 - Test suites must not be run against the production database
+
+## 10. Temporary Render demo
+
+Use Render only for a client demo. Do not point this at Hetzner or `www.madwits.com`.
+
+Create three things: a PostgreSQL database, a Docker web service for the FastAPI API, and a Docker web service for the Next.js UI. Settings and commands are in `docs/09-render-demo.md`.

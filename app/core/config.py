@@ -19,6 +19,22 @@ _PLACEHOLDER_PASSWORDS = {
 }
 
 
+def normalize_database_url(url: str) -> str:
+    """Accept Render/libpq URLs and the SQLAlchemy psycopg3 driver name."""
+    normalized = url.strip()
+    if normalized.startswith("postgres://"):
+        normalized = "postgresql://" + normalized[len("postgres://") :]
+    if normalized.startswith("postgresql://") and "+psycopg" not in normalized.split("://", 1)[0]:
+        normalized = "postgresql+psycopg://" + normalized[len("postgresql://") :]
+    host = normalized.split("@")[-1].lower()
+    if "sslmode=" not in normalized and (
+        "render.com" in host or host.startswith("dpg-") or ".dpg-" in host
+    ):
+        separator = "&" if "?" in normalized else "?"
+        normalized = f"{normalized}{separator}sslmode=require"
+    return normalized
+
+
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
         env_file=".env",
@@ -79,7 +95,7 @@ class Settings(BaseSettings):
     @property
     def sqlalchemy_database_uri(self) -> str:
         if self.database_url:
-            return self.database_url
+            return normalize_database_url(self.database_url)
         return URL.create(
             drivername="postgresql+psycopg",
             username=self.postgres_user,
