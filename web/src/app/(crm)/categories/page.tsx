@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { EllipsisVertical } from "lucide-react";
 import { categoriesApi, stagesApi } from "@/lib/api/endpoints";
 import { errorMessage } from "@/lib/errors";
 import type { PrintCategory, WorkflowStage } from "@/types/api";
@@ -19,6 +20,82 @@ import {
 } from "@/components/ui";
 import { useToast } from "@/components/Toast";
 
+function ActionMenu({
+  label,
+  disabled = false,
+  items,
+}: {
+  label: string;
+  disabled?: boolean;
+  items: { label: string; onSelect: () => void; disabled?: boolean; danger?: boolean }[];
+}) {
+  const rootRef = useRef<HTMLDivElement>(null);
+  const [open, setOpen] = useState(false);
+  const [above, setAbove] = useState(false);
+
+  useEffect(() => {
+    if (!open) return;
+    const rect = rootRef.current?.getBoundingClientRect();
+    setAbove(rect ? window.innerHeight - rect.bottom < 220 : false);
+    function onPointer(event: MouseEvent) {
+      if (!rootRef.current?.contains(event.target as Node)) setOpen(false);
+    }
+    function onKey(event: KeyboardEvent) {
+      if (event.key === "Escape") setOpen(false);
+    }
+    document.addEventListener("mousedown", onPointer);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onPointer);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+
+  return (
+    <div className="relative" ref={rootRef}>
+      <button
+        type="button"
+        className="flex min-h-11 min-w-11 items-center justify-center rounded-md text-muted hover:bg-canvas hover:text-charcoal focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-charcoal disabled:cursor-not-allowed disabled:opacity-50"
+        aria-label={label}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        disabled={disabled}
+        onClick={() => setOpen((value) => !value)}
+      >
+        <EllipsisVertical size={18} />
+      </button>
+      {open ? (
+        <div
+          role="menu"
+          className={`absolute right-0 z-20 min-w-44 rounded-lg border border-line bg-white py-1 shadow-[var(--shadow-pop)] ${
+            above ? "bottom-full mb-1" : "top-full mt-1"
+          }`}
+        >
+          {items.map((item) => (
+            <button
+              key={item.label}
+              type="button"
+              role="menuitem"
+              disabled={item.disabled}
+              className={`flex min-h-11 w-full items-center px-3 text-left text-sm disabled:cursor-not-allowed disabled:opacity-40 ${
+                item.danger
+                  ? "border-t border-line text-danger hover:bg-red-50"
+                  : "text-charcoal hover:bg-canvas"
+              }`}
+              onClick={() => {
+                setOpen(false);
+                item.onSelect();
+              }}
+            >
+              {item.label}
+            </button>
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 export default function CategoriesPage() {
   const toast = useToast();
   const [items, setItems] = useState<PrintCategory[]>([]);
@@ -28,6 +105,7 @@ export default function CategoriesPage() {
   const [error, setError] = useState("");
   const [editing, setEditing] = useState<PrintCategory | null | "new">(null);
   const [addingStage, setAddingStage] = useState(false);
+  const [editingStage, setEditingStage] = useState<WorkflowStage | null>(null);
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [stageName, setStageName] = useState("");
@@ -155,6 +233,23 @@ export default function CategoriesPage() {
     }
   }
 
+  async function saveStageEdit() {
+    if (!editingStage || !selected) return;
+    setBusy(true);
+    setError("");
+    try {
+      await stagesApi.update(editingStage.id, { name: stageName.trim() });
+      toast("Stage saved");
+      setEditingStage(null);
+      setStageName("");
+      await reloadStages(selected.id);
+    } catch (err) {
+      setError(errorMessage(err));
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function moveStage(stage: WorkflowStage, direction: -1 | 1) {
     setBusy(true);
     setError("");
@@ -203,6 +298,23 @@ export default function CategoriesPage() {
     }
   }
 
+  async function restoreStage(stage: WorkflowStage) {
+    if (!selected) return;
+    setBusy(true);
+    setError("");
+    try {
+      await stagesApi.update(stage.id, { is_active: true });
+      const listed = await reloadStages(selected.id);
+      await makeFirstAndLast(listed);
+      await reloadStages(selected.id);
+      toast("Stage restored");
+    } catch (err) {
+      setError(errorMessage(err));
+    } finally {
+      setBusy(false);
+    }
+  }
+
   if (loading) return <Spinner />;
 
   return (
@@ -242,21 +354,24 @@ export default function CategoriesPage() {
                   <h2 className="section-title text-charcoal">{selected.name}</h2>
                   {selected.description ? <p className="body-text text-muted">{selected.description}</p> : null}
                 </div>
-                <div className="flex gap-2">
-                  <Button
-                    variant="secondary"
-                    onClick={() => {
-                      setEditing(selected);
-                      setName(selected.name);
-                      setDescription(selected.description ?? "");
-                    }}
-                  >
-                    Edit
-                  </Button>
-                  <Button variant="secondary" disabled={busy} onClick={() => void toggleCategory(selected)}>
-                    {selected.is_active ? "Deactivate" : "Activate"}
-                  </Button>
-                </div>
+                <ActionMenu
+                  label={`Actions for ${selected.name}`}
+                  disabled={busy}
+                  items={[
+                    {
+                      label: "Edit",
+                      onSelect: () => {
+                        setEditing(selected);
+                        setName(selected.name);
+                        setDescription(selected.description ?? "");
+                      },
+                    },
+                    {
+                      label: selected.is_active ? "Deactivate" : "Activate",
+                      onSelect: () => void toggleCategory(selected),
+                    },
+                  ]}
+                />
               </div>
               <div className="mt-6 flex items-center justify-between gap-3">
                 <div>
@@ -294,53 +409,33 @@ export default function CategoriesPage() {
                           </span>
                           <ActiveBadge active={stage.is_active} />
                         </div>
-                        <div className="flex flex-wrap gap-2">
-                          <Button
-                            variant="secondary"
-                            disabled={busy || index === 0}
-                            onClick={() => void moveStage(stage, -1)}
-                          >
-                            Move up
-                          </Button>
-                          <Button
-                            variant="secondary"
-                            disabled={busy || index === ordered.length - 1}
-                            onClick={() => void moveStage(stage, 1)}
-                          >
-                            Move down
-                          </Button>
-                          {stage.is_active ? (
-                            <Button variant="danger" disabled={busy} onClick={() => void deactivateStage(stage)}>
-                              Hide
-                            </Button>
-                          ) : (
-                            <Button
-                              variant="secondary"
-                              disabled={busy}
-                              onClick={() => {
-                                void (async () => {
-                                  setBusy(true);
-                                  setError("");
-                                  try {
-                                    await stagesApi.update(stage.id, { is_active: true });
-                                    if (selected) {
-                                      const listed = await reloadStages(selected.id);
-                                      await makeFirstAndLast(listed);
-                                      await reloadStages(selected.id);
-                                    }
-                                    toast("Stage restored");
-                                  } catch (err) {
-                                    setError(errorMessage(err));
-                                  } finally {
-                                    setBusy(false);
-                                  }
-                                })();
-                              }}
-                            >
-                              Restore
-                            </Button>
-                          )}
-                        </div>
+                        <ActionMenu
+                          label={`Actions for ${stage.name}`}
+                          disabled={busy}
+                          items={[
+                            {
+                              label: "Edit",
+                              onSelect: () => {
+                                setError("");
+                                setStageName(stage.name);
+                                setEditingStage(stage);
+                              },
+                            },
+                            {
+                              label: "Move up",
+                              disabled: index === 0,
+                              onSelect: () => void moveStage(stage, -1),
+                            },
+                            {
+                              label: "Move down",
+                              disabled: index === ordered.length - 1,
+                              onSelect: () => void moveStage(stage, 1),
+                            },
+                            stage.is_active
+                              ? { label: "Hide", danger: true, onSelect: () => void deactivateStage(stage) }
+                              : { label: "Restore", onSelect: () => void restoreStage(stage) },
+                          ]}
+                        />
                       </div>
                     </li>
                     );
@@ -366,6 +461,23 @@ export default function CategoriesPage() {
           <Field label="Description">
             <Textarea value={description} onChange={(event) => setDescription(event.target.value)} />
           </Field>
+        </Modal>
+      ) : null}
+      {editingStage ? (
+        <Modal
+          title="Edit stage"
+          onClose={() => setEditingStage(null)}
+          onSubmit={saveStageEdit}
+          busy={busy}
+          submitLabel="Save stage"
+        >
+          {error ? <ErrorBanner message={error} /> : null}
+          <Field label="Stage name">
+            <Input required value={stageName} onChange={(event) => setStageName(event.target.value)} />
+          </Field>
+          <p className="body-text text-muted">
+            Jobs already on this step keep it. Only the name shown in the workflow changes.
+          </p>
         </Modal>
       ) : null}
       {addingStage ? (

@@ -167,14 +167,16 @@ export function Modal({
   onClose,
   onSubmit,
   submitLabel = "Save",
+  secondaryLabel,
   busy = false,
   nested = false,
 }: {
   title: string;
   children: ReactNode;
   onClose: () => void;
-  onSubmit?: (event: FormEvent) => void;
+  onSubmit?: (event: FormEvent, intent?: "save" | "next") => void;
   submitLabel?: string;
+  secondaryLabel?: string;
   busy?: boolean;
   nested?: boolean;
 }) {
@@ -209,7 +211,9 @@ export function Modal({
           event.preventDefault();
           event.stopPropagation();
           if (busy) return;
-          onSubmit?.(event);
+          const submitter = (event.nativeEvent as SubmitEvent).submitter;
+          const intent = submitter instanceof HTMLButtonElement && submitter.value === "next" ? "next" : "save";
+          onSubmit?.(event, intent);
         }}
       >
         <div className="flex shrink-0 items-start justify-between gap-3 border-b border-line px-4 py-3 sm:px-5 sm:py-4">
@@ -227,14 +231,30 @@ export function Modal({
           className={`${onSubmit ? "grid grid-cols-2" : "flex"} shrink-0 gap-2 border-t border-line bg-white px-4 pt-3 sm:flex sm:justify-end sm:px-5`}
           style={{ paddingBottom: "max(0.75rem, env(safe-area-inset-bottom))" }}
         >
-          <Button type="button" variant="secondary" className="w-full sm:w-auto" onClick={onClose} disabled={busy}>
-            Cancel
-          </Button>
-          {onSubmit ? (
-            <Button type="submit" className="w-full sm:w-auto" disabled={busy}>
-              {busy ? "Saving…" : submitLabel}
-            </Button>
-          ) : null}
+          {secondaryLabel && onSubmit ? (
+            <>
+              <Button type="submit" value="save" className="order-3 col-span-2 w-full sm:w-auto" disabled={busy}>
+                {submitLabel}
+              </Button>
+              <Button type="submit" value="next" variant="secondary" className="order-2 w-full sm:w-auto" disabled={busy}>
+                {secondaryLabel}
+              </Button>
+              <Button type="button" variant="secondary" className="order-1 w-full sm:w-auto" onClick={onClose} disabled={busy}>
+                Cancel
+              </Button>
+            </>
+          ) : (
+            <>
+              <Button type="button" variant="secondary" className="w-full sm:w-auto" onClick={onClose} disabled={busy}>
+                Cancel
+              </Button>
+              {onSubmit ? (
+                <Button type="submit" value="save" className="w-full sm:w-auto" disabled={busy}>
+                  {busy ? "Saving…" : submitLabel}
+                </Button>
+              ) : null}
+            </>
+          )}
         </div>
       </form>
     </div>,

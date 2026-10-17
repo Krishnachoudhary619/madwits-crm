@@ -66,6 +66,7 @@ export function JobDirectory({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [creating, setCreating] = useState(false);
+  const [listVersion, setListVersion] = useState(0);
 
   const stageOptions = useMemo(
     () =>
@@ -116,7 +117,7 @@ export function JobDirectory({
     return () => {
       cancelled = true;
     };
-  }, [q, status, customerId, categoryId, stageId, from, to, dueFrom, dueTo, overdue, page, mode]);
+  }, [q, status, customerId, categoryId, stageId, from, to, dueFrom, dueTo, overdue, page, mode, listVersion]);
 
   return (
     <div>
@@ -319,7 +320,13 @@ export function JobDirectory({
         <JobForm
           categories={categories}
           onClose={() => setCreating(false)}
-          onSaved={(job) => {
+          onSaved={(job, options) => {
+            if (options?.continue) {
+              toast(`Enquiry ${job.job_number} saved`);
+              setPage(1);
+              setListVersion((version) => version + 1);
+              return;
+            }
             setCreating(false);
             toast("Enquiry created");
             window.location.href = `/jobs/${job.id}`;
