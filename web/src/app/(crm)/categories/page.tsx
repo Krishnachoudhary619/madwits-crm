@@ -273,11 +273,8 @@ export default function CategoriesPage() {
           </Card>
           {selected ? (
             <Card className="p-4 lg:col-span-2">
-              <div className="flex flex-wrap items-start justify-between gap-2">
-                <div>
-                  <h2 className="section-title text-charcoal">{selected.name}</h2>
-                  {selected.description ? <p className="body-text text-muted">{selected.description}</p> : null}
-                </div>
+              <div className="flex items-start justify-between gap-3">
+                <h2 className="section-title min-w-0 flex-1 break-words text-charcoal">{selected.name}</h2>
                 <ActionMenu
                   label={`Actions for ${selected.name}`}
                   disabled={busy}
@@ -297,6 +294,7 @@ export default function CategoriesPage() {
                   ]}
                 />
               </div>
+              {selected.description ? <p className="mt-1 body-text text-muted">{selected.description}</p> : null}
               <div className="mt-6 flex items-center justify-between gap-3">
                 <div>
                   <h3 className="card-title">Job steps</h3>
@@ -321,9 +319,9 @@ export default function CategoriesPage() {
                     const isFirst = stage.is_active && active[0]?.id === stage.id;
                     return (
                     <li key={stage.id} className="rounded-lg border border-line p-3 text-sm">
-                      <div className="flex flex-wrap items-center justify-between gap-2">
-                        <div>
-                          <span className="font-medium">
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="min-w-0 flex-1">
+                          <span className="break-words font-medium">
                             Step {index + 1}. {stage.name}
                           </span>
                           <span className="ml-2 text-xs text-muted">
