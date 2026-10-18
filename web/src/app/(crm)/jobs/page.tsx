@@ -8,8 +8,8 @@ function JobsBody() {
   return (
     <JobDirectory
       mode="jobs"
-      title="Jobs & job cards"
-      description="Search confirmed production jobs and the full lifecycle, including lost and cancelled records."
+      title="Jobs"
+      description="Each row is a job card: who it is for, what to print, and which step it is on."
     />
   );
 }

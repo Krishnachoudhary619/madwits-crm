@@ -37,31 +37,51 @@ export function ActionMenu({
   items: { label: string; onSelect: () => void; disabled?: boolean; danger?: boolean }[];
 }) {
   const rootRef = useRef<HTMLDivElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
   const [open, setOpen] = useState(false);
-  const [above, setAbove] = useState(false);
+  const [panel, setPanel] = useState({ top: 0, left: 0, width: 220 });
 
   useEffect(() => {
     if (!open) return;
-    const rect = rootRef.current?.getBoundingClientRect();
-    setAbove(rect ? window.innerHeight - rect.bottom < 220 : false);
-    function onPointer(event: MouseEvent) {
-      if (!rootRef.current?.contains(event.target as Node)) setOpen(false);
+    function placeMenu() {
+      const rect = rootRef.current?.getBoundingClientRect();
+      if (!rect) return;
+      const width = Math.min(240, window.innerWidth - 16);
+      const height = Math.min(window.innerHeight * 0.7, items.length * 44 + 12);
+      const gap = 8;
+      const spaceBelow = window.innerHeight - rect.bottom;
+      const top = spaceBelow < height + gap && rect.top > height ? rect.top - height - gap : rect.bottom + gap;
+      let left = rect.right - width;
+      if (left < gap) left = rect.left;
+      left = Math.min(Math.max(gap, left), window.innerWidth - width - gap);
+      const maxTop = Math.max(gap, window.innerHeight - height - gap);
+      setPanel({ top: Math.min(Math.max(gap, top), maxTop), left, width });
+    }
+    placeMenu();
+    function onPointer(event: PointerEvent) {
+      const target = event.target as Node;
+      if (rootRef.current?.contains(target) || menuRef.current?.contains(target)) return;
+      setOpen(false);
     }
     function onKey(event: KeyboardEvent) {
       if (event.key === "Escape") setOpen(false);
     }
-    document.addEventListener("mousedown", onPointer);
+    document.addEventListener("pointerdown", onPointer);
     document.addEventListener("keydown", onKey);
+    window.addEventListener("resize", placeMenu);
+    window.addEventListener("scroll", placeMenu, true);
     return () => {
-      document.removeEventListener("mousedown", onPointer);
+      document.removeEventListener("pointerdown", onPointer);
       document.removeEventListener("keydown", onKey);
+      window.removeEventListener("resize", placeMenu);
+      window.removeEventListener("scroll", placeMenu, true);
     };
-  }, [open]);
+  }, [open, items.length]);
 
   if (items.length === 0) return null;
 
   return (
-    <div className="relative" ref={rootRef}>
+    <div className="relative shrink-0" ref={rootRef}>
       <button
         type="button"
         className="flex min-h-11 min-w-11 items-center justify-center rounded-md text-muted hover:bg-canvas hover:text-charcoal focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-charcoal disabled:cursor-not-allowed disabled:opacity-50"
@@ -73,34 +93,37 @@ export function ActionMenu({
       >
         <EllipsisVertical size={18} />
       </button>
-      {open ? (
-        <div
-          role="menu"
-          className={`absolute right-0 z-20 min-w-44 rounded-lg border border-line bg-white py-1 shadow-[var(--shadow-pop)] ${
-            above ? "bottom-full mb-1" : "top-full mt-1"
-          }`}
-        >
-          {items.map((item) => (
-            <button
-              key={item.label}
-              type="button"
-              role="menuitem"
-              disabled={item.disabled}
-              className={`flex min-h-11 w-full items-center px-3 text-left text-sm disabled:cursor-not-allowed disabled:opacity-40 ${
-                item.danger
-                  ? "border-t border-line text-danger hover:bg-red-50"
-                  : "text-charcoal hover:bg-canvas"
-              }`}
-              onClick={() => {
-                setOpen(false);
-                item.onSelect();
-              }}
+      {open
+        ? createPortal(
+            <div
+              ref={menuRef}
+              role="menu"
+              className="fixed z-[60] max-h-[70vh] overflow-y-auto rounded-lg border border-line bg-white py-1 shadow-[var(--shadow-pop)]"
+              style={{ top: panel.top, left: panel.left, width: panel.width }}
             >
-              {item.label}
-            </button>
-          ))}
-        </div>
-      ) : null}
+              {items.map((item) => (
+                <button
+                  key={item.label}
+                  type="button"
+                  role="menuitem"
+                  disabled={item.disabled}
+                  className={`flex min-h-11 w-full items-center whitespace-normal px-3 py-2 text-left text-sm disabled:cursor-not-allowed disabled:opacity-40 ${
+                    item.danger
+                      ? "border-t border-line text-danger hover:bg-red-50"
+                      : "text-charcoal hover:bg-canvas"
+                  }`}
+                  onClick={() => {
+                    setOpen(false);
+                    item.onSelect();
+                  }}
+                >
+                  {item.label}
+                </button>
+              ))}
+            </div>,
+            document.body,
+          )
+        : null}
     </div>
   );
 }
@@ -174,13 +197,17 @@ export function PageHeader({
   actions?: ReactNode;
 }) {
   return (
-    <div className="mb-5 flex flex-col gap-3 sm:mb-6 sm:flex-row sm:items-start sm:justify-between">
-      <div className="min-w-0">
-        {breadcrumb ? <div className="meta-text mb-1">{breadcrumb}</div> : null}
-        <h1 className="page-title text-charcoal">{title}</h1>
-        {description ? <p className="mt-1 max-w-2xl body-text text-muted">{description}</p> : null}
+    <div className="mb-5 flex items-start justify-between gap-3 sm:mb-6">
+      <div className="min-w-0 flex-1">
+        {breadcrumb ? <div className="meta-text mb-1 break-words">{breadcrumb}</div> : null}
+        <h1 className="page-title break-words text-charcoal">{title}</h1>
+        {description ? <p className="mt-1 max-w-2xl break-words body-text text-muted">{description}</p> : null}
       </div>
-      {actions ? <div className="flex flex-wrap gap-2">{actions}</div> : null}
+      {actions ? (
+        <div className="flex max-w-[50%] shrink-0 flex-col items-end gap-2 sm:max-w-none sm:flex-row sm:flex-wrap sm:items-center [&_button]:max-w-full [&_button]:whitespace-normal">
+          {actions}
+        </div>
+      ) : null}
     </div>
   );
 }

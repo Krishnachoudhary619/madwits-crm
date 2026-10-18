@@ -184,15 +184,6 @@ export default function ReportsPage() {
               </table>
             </div>
           </Card>
-          <Card className="mt-4 p-4 body-text text-muted sm:p-5">
-            <h2 className="card-title mb-2 text-charcoal">Not in this release</h2>
-            <ul className="list-disc space-y-1 pl-5">
-              <li>GST / invoice reports</li>
-              <li>Profit margins, material costs, inventory</li>
-              <li>Employee performance scores</li>
-              <li>Multi-period trend charts (no historical snapshot API)</li>
-            </ul>
-          </Card>
         </>
       )}
     </div>

@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { jobsApi } from "@/lib/api/endpoints";
-import { dateToIsoEnd, dateToIsoStart, formatDate } from "@/lib/dates";
+import { dateToIsoEnd, dateToIsoStart, formatDate, todayIsoDate, toDateInput } from "@/lib/dates";
 import { errorMessage } from "@/lib/errors";
 import { formatInr } from "@/lib/money";
 import { LEAD_LABELS, OPEN_ENQUIRY_STATUSES } from "@/lib/lifecycle";
@@ -14,6 +14,7 @@ import {
   Card,
   EmptyState,
   ErrorBanner,
+  Field,
   FilterPanel,
   Input,
   PageHeader,
@@ -119,6 +120,25 @@ export function JobDirectory({
     };
   }, [q, status, customerId, categoryId, stageId, from, to, dueFrom, dueTo, overdue, page, mode, listVersion]);
 
+  function stepName(job: Job): string {
+    if (job.current_stage_id) {
+      const stage = Object.values(stagesByCategory)
+        .flat()
+        .find((item) => item.id === job.current_stage_id);
+      if (stage) return stage.name;
+    }
+    return LEAD_LABELS[job.lead_status];
+  }
+
+  function dueText(due: string | null): { text: string; late: boolean } {
+    if (!due) return { text: "No due date", late: false };
+    const day = toDateInput(due);
+    const today = todayIsoDate();
+    if (day < today) return { text: `Late · ${formatDate(due)}`, late: true };
+    if (day === today) return { text: "Due today", late: true };
+    return { text: formatDate(due), late: false };
+  }
+
   return (
     <div>
       <PageHeader
@@ -185,24 +205,26 @@ export function JobDirectory({
               ))}
             </Select>
           ) : null}
-          <Input
-            type="date"
-            aria-label="Created from"
-            value={from}
-            onChange={(event) => {
-              setPage(1);
-              setFrom(event.target.value);
-            }}
-          />
-          <Input
-            type="date"
-            aria-label="Created to"
-            value={to}
-            onChange={(event) => {
-              setPage(1);
-              setTo(event.target.value);
-            }}
-          />
+          <Field label="Opened from">
+            <Input
+              type="date"
+              value={from}
+              onChange={(event) => {
+                setPage(1);
+                setFrom(event.target.value);
+              }}
+            />
+          </Field>
+          <Field label="Opened to">
+            <Input
+              type="date"
+              value={to}
+              onChange={(event) => {
+                setPage(1);
+                setTo(event.target.value);
+              }}
+            />
+          </Field>
         </div>
         {customerId ? (
           <p className="mt-3 body-text text-muted">
@@ -214,24 +236,26 @@ export function JobDirectory({
         ) : null}
         {mode === "jobs" ? (
           <div className="mt-3 grid gap-3 sm:grid-cols-2">
-            <Input
-              type="date"
-              aria-label="Due from"
-              value={dueFrom}
-              onChange={(event) => {
-                setPage(1);
-                setDueFrom(event.target.value);
-              }}
-            />
-            <Input
-              type="date"
-              aria-label="Due to"
-              value={dueTo}
-              onChange={(event) => {
-                setPage(1);
-                setDueTo(event.target.value);
-              }}
-            />
+            <Field label="Due from">
+              <Input
+                type="date"
+                value={dueFrom}
+                onChange={(event) => {
+                  setPage(1);
+                  setDueFrom(event.target.value);
+                }}
+              />
+            </Field>
+            <Field label="Due to">
+              <Input
+                type="date"
+                value={dueTo}
+                onChange={(event) => {
+                  setPage(1);
+                  setDueTo(event.target.value);
+                }}
+              />
+            </Field>
           </div>
         ) : null}
         {mode === "jobs" ? (
@@ -245,7 +269,7 @@ export function JobDirectory({
                 setOverdue(event.target.checked);
               }}
             />
-            Follow-up overdue
+            Follow-up is late
           </label>
         ) : null}
       </FilterPanel>
@@ -262,52 +286,96 @@ export function JobDirectory({
         <Card>
           <div className="p-3 md:p-0">
             <ResponsiveRecords
-              cards={items.map((job) => (
-                <RecordCard
-                  key={job.id}
-                  href={`/jobs/${job.id}`}
-                  title={job.job_number}
-                  subtitle={`${nameById(customers, job.customer_id)} · ${nameById(categories, job.category_id)}`}
-                  extra={<LeadBadge status={job.lead_status} />}
-                  meta={
-                    <>
-                      <span className="money">{formatInr(job.final_amount ?? job.quoted_amount)}</span>
-                      <span>Due {formatDate(job.due_date)}</span>
-                      {job.title ? <span className="truncate">{job.title}</span> : null}
-                    </>
-                  }
-                />
-              ))}
+              cards={items.map((job) => {
+                const due = dueText(job.due_date);
+                return (
+                  <RecordCard
+                    key={job.id}
+                    href={`/jobs/${job.id}`}
+                    title={mode === "jobs" ? nameById(customers, job.customer_id) : job.job_number}
+                    subtitle={
+                      mode === "jobs"
+                        ? `${job.title || nameById(categories, job.category_id)} · ${job.job_number}`
+                        : `${nameById(customers, job.customer_id)} · ${nameById(categories, job.category_id)}`
+                    }
+                    extra={
+                      mode === "jobs" ? (
+                        <span className="shrink-0 text-sm font-medium text-charcoal">{stepName(job)}</span>
+                      ) : (
+                        <LeadBadge status={job.lead_status} />
+                      )
+                    }
+                    meta={
+                      <>
+                        <span className="money">{formatInr(job.final_amount ?? job.quoted_amount)}</span>
+                        <span className={due.late ? "font-medium text-danger" : undefined}>{due.text}</span>
+                        {mode === "jobs" ? <span>{nameById(categories, job.category_id)}</span> : job.title ? <span className="truncate">{job.title}</span> : null}
+                      </>
+                    }
+                  />
+                );
+              })}
               table={
                 <table className="table-grid">
                   <thead>
                     <tr>
-                      <th>Job</th>
-                      <th>Customer</th>
-                      <th>Category</th>
-                      <th>Status</th>
-                      <th>Amount</th>
-                      <th>Due</th>
+                      {mode === "jobs" ? (
+                        <>
+                          <th>Customer</th>
+                          <th>What to print</th>
+                          <th>Step</th>
+                          <th>Due</th>
+                          <th>Amount</th>
+                        </>
+                      ) : (
+                        <>
+                          <th>Job</th>
+                          <th>Customer</th>
+                          <th>Category</th>
+                          <th>Status</th>
+                          <th>Amount</th>
+                          <th>Due</th>
+                        </>
+                      )}
                     </tr>
                   </thead>
                   <tbody>
-                    {items.map((job) => (
-                      <tr key={job.id}>
-                        <td>
-                          <Link className="font-medium hover:underline" href={`/jobs/${job.id}`}>
-                            {job.job_number}
-                          </Link>
-                          <div className="meta-text">{job.title}</div>
-                        </td>
-                        <td>{nameById(customers, job.customer_id)}</td>
-                        <td>{nameById(categories, job.category_id)}</td>
-                        <td>
-                          <LeadBadge status={job.lead_status} />
-                        </td>
-                        <td className="money">{formatInr(job.final_amount ?? job.quoted_amount)}</td>
-                        <td>{formatDate(job.due_date)}</td>
-                      </tr>
-                    ))}
+                    {items.map((job) => {
+                      const due = dueText(job.due_date);
+                      return mode === "jobs" ? (
+                        <tr key={job.id}>
+                          <td>
+                            <Link className="font-medium hover:underline" href={`/jobs/${job.id}`}>
+                              {nameById(customers, job.customer_id)}
+                            </Link>
+                            <div className="meta-text">{job.job_number}</div>
+                          </td>
+                          <td>
+                            {job.title || "—"}
+                            <div className="meta-text">{nameById(categories, job.category_id)}</div>
+                          </td>
+                          <td>{stepName(job)}</td>
+                          <td className={due.late ? "font-medium text-danger" : undefined}>{due.text}</td>
+                          <td className="money">{formatInr(job.final_amount ?? job.quoted_amount)}</td>
+                        </tr>
+                      ) : (
+                        <tr key={job.id}>
+                          <td>
+                            <Link className="font-medium hover:underline" href={`/jobs/${job.id}`}>
+                              {job.job_number}
+                            </Link>
+                            <div className="meta-text">{job.title}</div>
+                          </td>
+                          <td>{nameById(customers, job.customer_id)}</td>
+                          <td>{nameById(categories, job.category_id)}</td>
+                          <td>
+                            <LeadBadge status={job.lead_status} />
+                          </td>
+                          <td className="money">{formatInr(job.final_amount ?? job.quoted_amount)}</td>
+                          <td>{formatDate(job.due_date)}</td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               }

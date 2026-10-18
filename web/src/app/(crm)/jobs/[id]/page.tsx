@@ -100,8 +100,8 @@ export default function JobDetailPage() {
   return (
     <div>
       <PageHeader
-        title={job.job_number}
-        description={job.title || category?.name}
+        title={customer?.name ?? job.job_number}
+        description={`${job.job_number}${job.title ? ` · ${job.title}` : ""}${category ? ` · ${category.name}` : ""} · Qty ${job.quantity}`}
         breadcrumb={
           <>
             <Link href="/jobs" className="hover:underline">
@@ -153,27 +153,53 @@ export default function JobDetailPage() {
 
       <div className="grid items-start gap-4 lg:grid-cols-3">
         <Card className="p-4 sm:p-5 lg:col-span-2">
-          <h2 className="section-title mb-4 text-charcoal">Overview</h2>
-          <dl className="grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-3">
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+            <h2 className="section-title text-charcoal">Job card</h2>
+            <LeadBadge status={job.lead_status} />
+          </div>
+          <p className="body-text">
+            {job.current_stage_id ? (
+              <>
+                Now at <strong>{stageName(job.current_stage_id)}</strong>
+              </>
+            ) : (
+              "Not on a production step yet."
+            )}
+          </p>
+          <ol className="mt-3 flex flex-wrap gap-2">
+            {activeStages(stages).map((stage, index, workflow) => {
+              const currentIndex = workflow.findIndex((item) => item.id === job.current_stage_id);
+              const current = stage.id === job.current_stage_id;
+              const done = currentIndex >= 0 && index < currentIndex;
+              return (
+                <li
+                  key={stage.id}
+                  className={`rounded-full px-3 py-1 text-sm ${
+                    current ? "bg-amber font-medium text-charcoal" : done ? "bg-canvas text-charcoal" : "text-muted"
+                  }`}
+                >
+                  {index + 1}. {stage.name}
+                </li>
+              );
+            })}
+          </ol>
+          {activeStages(stages).length === 0 ? (
+            <p className="mt-2 meta-text">No steps are configured for this print type.</p>
+          ) : null}
+          <dl className="mt-5 grid grid-cols-2 gap-x-4 gap-y-3 border-t border-line pt-4 sm:grid-cols-3">
             <Detail label="Customer">
               <Link className="hover:underline" href={`/customers/${job.customer_id}`}>
                 {customer?.name}
               </Link>
               {customer?.phone ? <div className="font-normal text-muted">{customer.phone}</div> : null}
             </Detail>
-            <Detail label="Print category">{category?.name}</Detail>
-            <Detail label="Order status">
-              <LeadBadge status={job.lead_status} />
+            <Detail label="Due">{formatDate(job.due_date)}</Detail>
+            <Detail label="Amount">
+              <span className="money">{formatInr(job.final_amount ?? job.quoted_amount)}</span>
             </Detail>
-            <Detail label="Quantity">{job.quantity}</Detail>
-            <Detail label="Quoted">
-              <span className="money">{formatInr(job.quoted_amount)}</span>
-            </Detail>
-            <Detail label="Final amount">
-              <span className="money">{formatInr(job.final_amount)}</span>
-            </Detail>
-            <Detail label="Due date">{formatDate(job.due_date)}</Detail>
-            <Detail label="Follow-up">{formatDateTime(job.next_follow_up_at)}</Detail>
+            {job.next_follow_up_at ? (
+              <Detail label="Follow-up">{formatDateTime(job.next_follow_up_at)}</Detail>
+            ) : null}
           </dl>
           {hasDetails ? (
             <div className="mt-5 space-y-3 border-t border-line pt-4">
@@ -242,30 +268,7 @@ export default function JobDetailPage() {
       </div>
 
       <Card className="mt-4 p-4 sm:p-5">
-        <h2 className="section-title text-charcoal">Production</h2>
-        <p className="mt-2 body-text">
-          Current stage: <strong>{job.current_stage_id ? stageName(job.current_stage_id) : "Not started"}</strong>
-        </p>
-        <ol className="mt-3 flex flex-wrap gap-2">
-          {activeStages(stages).map((stage, index, workflow) => {
-            const currentIndex = workflow.findIndex((item) => item.id === job.current_stage_id);
-            const current = stage.id === job.current_stage_id;
-            const done = currentIndex >= 0 && index < currentIndex;
-            return (
-              <li
-                key={stage.id}
-                className={`rounded-full px-3 py-1 text-sm ${
-                  current ? "bg-amber font-medium text-charcoal" : done ? "bg-canvas text-charcoal" : "text-muted"
-                }`}
-              >
-                {index + 1}. {stage.name}
-              </li>
-            );
-          })}
-        </ol>
-        {activeStages(stages).length === 0 ? (
-          <p className="mt-2 meta-text">No steps are configured for this category.</p>
-        ) : null}
+        <h2 className="section-title text-charcoal">Step history</h2>
         <ol className="mt-4 space-y-3">
           {history.map((entry) => (
             <li key={entry.id} className="border-l-2 border-amber pl-3">
