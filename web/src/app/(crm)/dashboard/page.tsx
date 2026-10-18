@@ -633,7 +633,7 @@ export default function DashboardPage() {
                 <Banknote size={16} /> Payments
               </Link>
               <Link href="/production" className={buttonClass("secondary")}>
-                <PackageCheck size={16} /> Production board
+                <PackageCheck size={16} /> Work in progress
               </Link>
             </div>
           </section>

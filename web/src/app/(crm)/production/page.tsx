@@ -3,45 +3,59 @@
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { jobsApi } from "@/lib/api/endpoints";
-import { formatDate } from "@/lib/dates";
-import { errorMessage } from "@/lib/errors";
+import { formatDate, todayIsoDate, toDateInput } from "@/lib/dates";
+import { ApiError, errorMessage } from "@/lib/errors";
 import { adjacentStage, listAllJobs } from "@/lib/jobs";
 import { formatInr } from "@/lib/money";
-import type { Job, WorkflowStage } from "@/types/api";
+import type { Job, PrintCategory, WorkflowStage } from "@/types/api";
 import { Button, Card, EmptyState, ErrorBanner, Field, Modal, PageHeader, Select, Spinner, Textarea } from "@/components/ui";
 import { AttributionSelect } from "@/features/jobs/AttributionSelect";
 import { useCatalogs, nameById } from "@/hooks/useCatalogs";
 import { useToast } from "@/components/Toast";
-import { ApiError } from "@/lib/errors";
 
-function JobCard({
+function dueLabel(due: string | null): { text: string; urgent: boolean } {
+  if (!due) return { text: "No due date", urgent: false };
+  const day = toDateInput(due);
+  const today = todayIsoDate();
+  if (day < today) return { text: `Late · was due ${formatDate(due)}`, urgent: true };
+  if (day === today) return { text: "Due today", urgent: true };
+  return { text: `Due ${formatDate(due)}`, urgent: false };
+}
+
+function JobRow({
   job,
   customerName,
-  categoryName,
   moveLabel,
   onMove,
 }: {
   job: Job;
   customerName: string;
-  categoryName: string;
   moveLabel: string | null;
   onMove: (job: Job) => void;
 }) {
+  const due = dueLabel(job.due_date);
   return (
-    <Card className="p-3">
-      <Link href={`/jobs/${job.id}`} className="font-medium hover:underline">
-        {job.job_number}
-      </Link>
-      <p className="body-text">{customerName}</p>
-      <p className="meta-text">{categoryName}</p>
-      <p className="mt-1 meta-text">Due {formatDate(job.due_date)}</p>
-      <p className="money body-text font-medium">{formatInr(job.final_amount ?? job.quoted_amount)}</p>
-      {moveLabel ? (
-        <Button className="mt-2 w-full" variant="secondary" onClick={() => onMove(job)}>
-          {moveLabel}
-        </Button>
-      ) : null}
-    </Card>
+    <li className="flex flex-col gap-3 py-3 sm:flex-row sm:items-center sm:justify-between">
+      <div className="min-w-0">
+        <Link href={`/jobs/${job.id}`} className="font-medium text-charcoal hover:underline">
+          {customerName}
+        </Link>
+        <p className="meta-text">
+          {job.title ? `${job.title} · ` : ""}
+          {job.job_number}
+          {job.quantity > 1 ? ` · Qty ${job.quantity}` : ""}
+        </p>
+        <p className={`mt-0.5 text-sm ${due.urgent ? "font-medium text-danger" : "text-muted"}`}>{due.text}</p>
+      </div>
+      <div className="flex flex-wrap items-center gap-3 sm:justify-end">
+        <span className="money text-sm font-medium">{formatInr(job.final_amount ?? job.quoted_amount)}</span>
+        {moveLabel ? (
+          <Button variant="secondary" onClick={() => onMove(job)}>
+            {moveLabel}
+          </Button>
+        ) : null}
+      </div>
+    </li>
   );
 }
 
@@ -50,8 +64,6 @@ export default function ProductionPage() {
   const { customers, categories, stagesByCategory, reload } = useCatalogs();
   const [jobs, setJobs] = useState<Job[]>([]);
   const [categoryId, setCategoryId] = useState("");
-  const [stageFilter, setStageFilter] = useState("");
-  const [mobileStage, setMobileStage] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [moving, setMoving] = useState<Job | null>(null);
@@ -67,7 +79,6 @@ export default function ProductionPage() {
       const items = await listAllJobs({
         lead_status: ["CONFIRMED"],
         category_id: categoryId || undefined,
-        current_stage_id: stageFilter || undefined,
         sort: "due_date",
         order: "asc",
       });
@@ -77,47 +88,38 @@ export default function ProductionPage() {
     } finally {
       setLoading(false);
     }
-  }, [categoryId, stageFilter]);
+  }, [categoryId]);
 
   useEffect(() => {
     void loadJobs();
   }, [loadJobs]);
 
-  const columns = useMemo(() => {
-    const source = categoryId
-      ? (stagesByCategory[categoryId] ?? []).filter((stage) => stage.is_active)
-      : Object.values(stagesByCategory)
-          .flat()
-          .filter((stage) => stage.is_active);
-    const unique = new Map<string, WorkflowStage & { categoryName: string }>();
-    for (const stage of source.sort((a, b) => a.sequence - b.sequence)) {
-      unique.set(stage.id, {
-        ...stage,
-        categoryName: nameById(categories, stage.category_id),
-      });
-    }
-    return [...unique.values()];
-  }, [stagesByCategory, categoryId, categories]);
+  const groups = useMemo(() => {
+    const chosen = categories.filter((category) => !categoryId || category.id === categoryId);
+    return chosen
+      .map((category) => {
+        const stages = (stagesByCategory[category.id] ?? [])
+          .filter((stage) => stage.is_active)
+          .sort((a, b) => a.sequence - b.sequence);
+        const categoryJobs = jobs.filter((job) => job.category_id === category.id);
+        return { category, stages, jobs: categoryJobs };
+      })
+      .filter((group) => (categoryId ? group.stages.length > 0 || group.jobs.length > 0 : group.jobs.length > 0));
+  }, [categories, categoryId, jobs, stagesByCategory]);
 
-  const jobsByStage = useMemo(() => {
-    const map = new Map<string, Job[]>();
-    for (const job of jobs) {
-      const key = job.current_stage_id ?? "unassigned";
-      map.set(key, [...(map.get(key) ?? []), job]);
-    }
-    return map;
-  }, [jobs]);
-
-  useEffect(() => {
-    if (!mobileStage && columns[0]) setMobileStage(columns[0].id);
-  }, [columns, mobileStage]);
+  function stageName(list: WorkflowStage[], id: string | null) {
+    return nameById(
+      list.map((stage) => ({ id: stage.id, name: stage.name })),
+      id,
+    );
+  }
 
   function moveLabelFor(job: Job) {
     const list = stagesByCategory[job.category_id] ?? [];
     const next = adjacentStage(list, job.current_stage_id, 1);
-    if (next) return `Next: ${next.name}`;
+    if (next) return `Send to ${next.name}`;
     const previous = adjacentStage(list, job.current_stage_id, -1);
-    return previous ? `Back: ${previous.name}` : null;
+    return previous ? `Send back to ${previous.name}` : null;
   }
 
   function beginMove(job: Job) {
@@ -141,13 +143,13 @@ export default function ProductionPage() {
         expected_current_stage_id: moving.current_stage_id,
         notes: notes || null,
       });
-      toast("Stage updated");
+      toast("Job moved");
       setMoving(null);
       setNotes("");
       await loadJobs();
     } catch (err) {
       if (err instanceof ApiError && err.status === 409) {
-        setError(`${errorMessage(err)} Refresh the board and retry.`);
+        setError(`${errorMessage(err)} Refresh the list and try again.`);
         await loadJobs();
       } else {
         setError(errorMessage(err));
@@ -157,178 +159,96 @@ export default function ProductionPage() {
     }
   }
 
-  const unassigned = jobsByStage.get("unassigned") ?? [];
-  const selectedMobileJobs =
-    mobileStage === "unassigned" ? unassigned : (jobsByStage.get(mobileStage) ?? []);
+  const movingStages = moving ? (stagesByCategory[moving.category_id] ?? []) : [];
+  const movingNext = moving ? adjacentStage(movingStages, moving.current_stage_id, 1) : null;
+  const movingPrevious = moving ? adjacentStage(movingStages, moving.current_stage_id, -1) : null;
+  const movingAlternate =
+    movingNext && movingPrevious && movingNext.id !== movingPrevious.id
+      ? toStage === movingPrevious.id
+        ? movingNext
+        : movingPrevious
+      : null;
 
   return (
     <div>
       <PageHeader
-        title="Production board"
-        description="Confirmed jobs grouped by each category's configured workflow stages. Stage names come from the backend, not a fixed Design/Print list."
+        title="Work in progress"
+        description="Confirmed jobs the shop is making. Read down the page: each print type, then its steps in order. When a step is finished, send the job to the next step."
         actions={
           <Button variant="secondary" onClick={() => void Promise.all([reload(), loadJobs()])}>
             Refresh
           </Button>
         }
       />
-      <div className="mb-4 grid gap-3 sm:grid-cols-2">
-        <Select
-          value={categoryId}
-          onChange={(event) => {
-            setCategoryId(event.target.value);
-            setStageFilter("");
-            setMobileStage("");
-          }}
-          aria-label="Filter category"
-        >
-          <option value="">All categories</option>
-          {categories.map((category) => (
-            <option key={category.id} value={category.id}>
-              {category.name}
-            </option>
-          ))}
-        </Select>
-        <Select value={stageFilter} onChange={(event) => setStageFilter(event.target.value)} aria-label="Filter stage">
-          <option value="">All stages</option>
-          {columns.map((stage) => (
-            <option key={stage.id} value={stage.id}>
-              {"categoryName" in stage ? `${stage.categoryName} · ` : ""}
-              {stage.name}
-            </option>
-          ))}
-        </Select>
+      <div className="mb-4 max-w-sm">
+        <Field label="Print type">
+          <Select
+            value={categoryId}
+            onChange={(event) => setCategoryId(event.target.value)}
+            aria-label="Print type"
+          >
+            <option value="">All print types with jobs</option>
+            {categories.map((category) => (
+              <option key={category.id} value={category.id}>
+                {category.name}
+              </option>
+            ))}
+          </Select>
+        </Field>
       </div>
       {error && !moving ? <ErrorBanner message={error} /> : null}
       {loading ? (
         <Spinner />
-      ) : columns.length === 0 ? (
+      ) : jobs.length === 0 ? (
         <EmptyState
-          title="No workflow stages"
-          description="Configure print categories and stages before using the production board."
+          title="Nothing is being made"
+          description="Confirmed jobs appear here, listed under the step they are on."
         />
       ) : (
-        <>
-          <div className="lg:hidden">
-            <Select
-              aria-label="Production stage"
-              value={mobileStage}
-              onChange={(event) => setMobileStage(event.target.value)}
-            >
-              {unassigned.length > 0 ? (
-                <option value="unassigned">Unassigned ({unassigned.length})</option>
-              ) : null}
-              {columns.map((stage) => (
-                <option key={stage.id} value={stage.id}>
-                  {stage.name} · {nameById(categories, stage.category_id)} (
-                  {(jobsByStage.get(stage.id) ?? []).length})
-                </option>
-              ))}
-            </Select>
-            <div className="mt-3 space-y-2">
-              {selectedMobileJobs.map((job) => (
-                <JobCard
-                  key={job.id}
-                  job={job}
-                  customerName={nameById(customers, job.customer_id)}
-                  categoryName={nameById(categories, job.category_id)}
-                  moveLabel={moveLabelFor(job)}
-                  onMove={beginMove}
-                />
-              ))}
-              {selectedMobileJobs.length === 0 ? (
-                <p className="body-text text-muted">No confirmed jobs in this stage.</p>
-              ) : null}
-            </div>
-          </div>
-          <div className="hidden gap-3 overflow-x-auto pb-4 lg:flex">
-            {unassigned.length > 0 ? (
-              <section className="w-72 shrink-0">
-                <h2 className="card-title mb-2">
-                  Unassigned <span className="ml-1 font-normal text-muted">{unassigned.length}</span>
-                </h2>
-                <div className="space-y-2">
-                  {unassigned.map((job) => (
-                    <JobCard
-                      key={job.id}
-                      job={job}
-                      customerName={nameById(customers, job.customer_id)}
-                      categoryName={nameById(categories, job.category_id)}
-                      moveLabel={moveLabelFor(job)}
-                      onMove={beginMove}
-                    />
-                  ))}
-                </div>
-              </section>
-            ) : null}
-            {columns.map((stage) => {
-              const columnJobs = jobsByStage.get(stage.id) ?? [];
-              return (
-                <section key={stage.id} className="w-72 shrink-0">
-                  <div className="mb-2 flex items-baseline justify-between gap-2">
-                    <h2 className="card-title text-charcoal">
-                      {stage.name}
-                      <span className="ml-2 font-normal text-muted">{columnJobs.length}</span>
-                    </h2>
-                    <span className="meta-text">{nameById(categories, stage.category_id)}</span>
-                  </div>
-                  <div className="space-y-2">
-                    {columnJobs.map((job) => (
-                      <JobCard
-                        key={job.id}
-                        job={job}
-                        customerName={nameById(customers, job.customer_id)}
-                        categoryName={nameById(categories, job.category_id)}
-                        moveLabel={moveLabelFor(job)}
-                        onMove={beginMove}
-                      />
-                    ))}
-                  </div>
-                </section>
-              );
-            })}
-          </div>
-        </>
+        <div className="space-y-4">
+          <p className="body-text text-muted">
+            {jobs.length} {jobs.length === 1 ? "job" : "jobs"} in the shop
+            {groups.length > 1 ? ` · ${groups.length} print types` : ""}. Late jobs are marked in red.
+          </p>
+          {groups.map((group) => (
+            <CategorySection
+              key={group.category.id}
+              category={group.category}
+              stages={group.stages}
+              jobs={group.jobs}
+              customerName={(id) => nameById(customers, id)}
+              moveLabelFor={moveLabelFor}
+              onMove={beginMove}
+            />
+          ))}
+          <OrphanJobs
+            jobs={jobs.filter((job) => !groups.some((group) => group.category.id === job.category_id))}
+            customerName={(id) => nameById(customers, id)}
+            moveLabelFor={moveLabelFor}
+            onMove={beginMove}
+          />
+        </div>
       )}
       {moving ? (
         <Modal
-          title={`Move ${moving.job_number}`}
+          title={`Move ${nameById(customers, moving.customer_id)}`}
           onClose={() => setMoving(null)}
           onSubmit={submitMove}
           busy={busy}
-          submitLabel="Update stage"
+          submitLabel="Move this job"
         >
           {error ? <ErrorBanner message={error} /> : null}
           <p className="body-text text-muted">
-            {nameById(
-              (stagesByCategory[moving.category_id] ?? []).map((stage) => ({ id: stage.id, name: stage.name })),
-              moving.current_stage_id,
-            )}{" "}
-            moves to{" "}
-            <span className="font-medium text-charcoal">
-              {nameById(
-                (stagesByCategory[moving.category_id] ?? []).map((stage) => ({ id: stage.id, name: stage.name })),
-                toStage,
-              )}
-            </span>
-            .
+            {stageName(movingStages, moving.current_stage_id)} moves to{" "}
+            <span className="font-medium text-charcoal">{stageName(movingStages, toStage)}</span>.
           </p>
-          {(() => {
-            const list = stagesByCategory[moving.category_id] ?? [];
-            const next = adjacentStage(list, moving.current_stage_id, 1);
-            const previous = adjacentStage(list, moving.current_stage_id, -1);
-            if (!next || !previous || next.id === previous.id) return null;
-            const alternate = toStage === previous.id ? next : previous;
-            return (
-              <button
-                type="button"
-                className="text-sm text-charcoal underline"
-                onClick={() => setToStage(alternate.id)}
-              >
-                {alternate.id === previous.id ? `Move back to ${previous.name} instead` : `Move forward to ${next.name} instead`}
-              </button>
-            );
-          })()}
+          {movingAlternate ? (
+            <button type="button" className="text-sm text-charcoal underline" onClick={() => setToStage(movingAlternate.id)}>
+              {movingAlternate.id === movingPrevious?.id
+                ? `Send back to ${movingPrevious.name} instead`
+                : `Send on to ${movingNext?.name} instead`}
+            </button>
+          ) : null}
           <AttributionSelect value={attribution} onChange={setAttribution} />
           <Field label="Notes">
             <Textarea value={notes} onChange={(event) => setNotes(event.target.value)} />
@@ -336,5 +256,130 @@ export default function ProductionPage() {
         </Modal>
       ) : null}
     </div>
+  );
+}
+
+function OrphanJobs({
+  jobs,
+  customerName,
+  moveLabelFor,
+  onMove,
+}: {
+  jobs: Job[];
+  customerName: (id: string) => string;
+  moveLabelFor: (job: Job) => string | null;
+  onMove: (job: Job) => void;
+}) {
+  if (jobs.length === 0) return null;
+  return (
+    <Card className="px-4 py-3">
+      <h2 className="section-title text-charcoal">Other jobs</h2>
+      <p className="meta-text">These jobs are confirmed, but their print type is no longer on the list.</p>
+      <ul className="divide-y divide-line">
+        {jobs.map((job) => (
+          <JobRow
+            key={job.id}
+            job={job}
+            customerName={customerName(job.customer_id)}
+            moveLabel={moveLabelFor(job)}
+            onMove={onMove}
+          />
+        ))}
+      </ul>
+    </Card>
+  );
+}
+
+function CategorySection({
+  category,
+  stages,
+  jobs,
+  customerName,
+  moveLabelFor,
+  onMove,
+}: {
+  category: PrintCategory;
+  stages: WorkflowStage[];
+  jobs: Job[];
+  customerName: (id: string) => string;
+  moveLabelFor: (job: Job) => string | null;
+  onMove: (job: Job) => void;
+}) {
+  const waiting = jobs.filter((job) => !job.current_stage_id);
+  return (
+    <Card className="overflow-hidden">
+      <div className="border-b border-line px-4 py-3">
+        <h2 className="section-title text-charcoal">{category.name}</h2>
+        <p className="meta-text">
+          {jobs.length} {jobs.length === 1 ? "job" : "jobs"} · {stages.length}{" "}
+          {stages.length === 1 ? "step" : "steps"}
+        </p>
+      </div>
+      {waiting.length > 0 ? (
+        <div className="border-b border-line px-4 py-3">
+          <h3 className="card-title text-charcoal">Not on a step yet</h3>
+          <ul className="divide-y divide-line">
+            {waiting.map((job) => (
+              <JobRow
+                key={job.id}
+                job={job}
+                customerName={customerName(job.customer_id)}
+                moveLabel={moveLabelFor(job)}
+                onMove={onMove}
+              />
+            ))}
+          </ul>
+        </div>
+      ) : null}
+      {stages.length === 0 ? (
+        <div className="px-4 py-3">
+          <p className="body-text text-muted">This print type has no steps yet.</p>
+          <ul className="divide-y divide-line">
+            {jobs.map((job) => (
+              <JobRow
+                key={job.id}
+                job={job}
+                customerName={customerName(job.customer_id)}
+                moveLabel={moveLabelFor(job)}
+                onMove={onMove}
+              />
+            ))}
+          </ul>
+        </div>
+      ) : (
+        <ol>
+          {stages.map((stage, index) => {
+            const stageJobs = jobs.filter((job) => job.current_stage_id === stage.id);
+            const count = stageJobs.length;
+            return (
+              <li key={stage.id} className="border-b border-line px-4 py-3 last:border-b-0">
+                <div className="flex items-baseline justify-between gap-3">
+                  <h3 className={`card-title ${count > 0 ? "text-charcoal" : "text-muted"}`}>
+                    Step {index + 1}. {stage.name}
+                    {stage.is_final ? <span className="ml-2 font-normal text-muted">Last step</span> : null}
+                  </h3>
+                  <span className={`shrink-0 text-sm ${count > 0 ? "font-medium text-charcoal" : "text-muted"}`}>
+                    {count === 0 ? "Nothing here" : count === 1 ? "1 job" : `${count} jobs`}
+                  </span>
+                </div>
+                {count > 0 ? (
+                  <ul className="divide-y divide-line">
+                    {stageJobs.map((job) => (
+                      <JobRow
+                        key={job.id}
+                        job={job}
+                        customerName={customerName(job.customer_id)}
+                        moveLabel={moveLabelFor(job)}
+                        onMove={onMove}
+                      />
+                    ))}
+                  </ul>
+                ) : null}
+              </li>
+            );
+          })}
+        </ol>
+      )}
+    </Card>
   );
 }
