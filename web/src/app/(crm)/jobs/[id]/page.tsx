@@ -6,7 +6,7 @@ import { useCallback, useEffect, useState } from "react";
 import { categoriesApi, customersApi, jobsApi, usersApi } from "@/lib/api/endpoints";
 import { formatDate, formatDateTime } from "@/lib/dates";
 import { errorMessage } from "@/lib/errors";
-import { specText } from "@/lib/jobs";
+import { activeStages, specText } from "@/lib/jobs";
 import { formatInr } from "@/lib/money";
 import { canRecordPayment, canSendBill } from "@/lib/lifecycle";
 import type {
@@ -23,7 +23,7 @@ import { Button, Card, ErrorBanner, PageHeader, Spinner } from "@/components/ui"
 import { LeadBadge, PaymentBadge } from "@/components/StatusBadge";
 import { JobForm } from "@/features/jobs/JobForm";
 import { JobActions, PaymentModal } from "@/features/jobs/JobActions";
-import { SendBillButton } from "@/features/jobs/SendBillButton";
+import { deliverBill } from "@/features/jobs/SendBillButton";
 import { useToast } from "@/components/Toast";
 
 function Detail({ label, children }: { label: string; children: React.ReactNode }) {
@@ -112,17 +112,33 @@ export default function JobDetailPage() {
           </>
         }
         actions={
-          <>
-            <Button variant="secondary" onClick={() => setEditing(true)}>
-              Edit job
-            </Button>
-            {canSendBill(job.lead_status) ? (
-              <SendBillButton job={job} customer={customer} category={category} balance={balance} />
-            ) : null}
-            {canRecordPayment(job.lead_status) ? (
-              <Button onClick={() => setPaying(true)}>Record payment</Button>
-            ) : null}
-          </>
+          <JobActions
+            job={job}
+            stages={stages}
+            onEdit={() => setEditing(true)}
+            onRecordPayment={
+              canRecordPayment(job.lead_status) && balance ? () => setPaying(true) : undefined
+            }
+            onSendBill={
+              canSendBill(job.lead_status)
+                ? () => {
+                    void deliverBill(job, customer, category, balance).catch((err: unknown) => {
+                      if (err instanceof Error && err.name === "AbortError") return;
+                      toast(errorMessage(err), "err");
+                    });
+                  }
+                : undefined
+            }
+            onUpdated={(updated, hadConflict) => {
+              if (hadConflict) {
+                setConflict("This job changed since it was loaded. Refresh and try again.");
+                return;
+              }
+              toast("Job updated");
+              setJob(updated);
+              void load();
+            }}
+          />
         }
       />
       {conflict ? (
@@ -134,22 +150,6 @@ export default function JobDetailPage() {
         </div>
       ) : null}
       {error ? <ErrorBanner message={error} /> : null}
-
-      <div className="mb-5">
-        <JobActions
-          job={job}
-          stages={stages}
-          onUpdated={(updated, hadConflict) => {
-            if (hadConflict) {
-              setConflict("This job changed since it was loaded. Refresh and try again.");
-              return;
-            }
-            toast("Job updated");
-            setJob(updated);
-            void load();
-          }}
-        />
-      </div>
 
       <div className="grid items-start gap-4 lg:grid-cols-3">
         <Card className="p-4 sm:p-5 lg:col-span-2">
@@ -222,11 +222,6 @@ export default function JobDetailPage() {
           ) : (
             <p className="mt-2 body-text text-muted">Payment balances are available after the job is confirmed.</p>
           )}
-          {canRecordPayment(job.lead_status) && balance?.payment_status !== "PAID" ? (
-            <Button className="mt-4 w-full" onClick={() => setPaying(true)}>
-              Record payment
-            </Button>
-          ) : null}
           {payments.length > 0 ? (
             <ul className="mt-4 space-y-2 border-t border-line pt-3">
               {payments.map((payment) => (
@@ -249,11 +244,28 @@ export default function JobDetailPage() {
       <Card className="mt-4 p-4 sm:p-5">
         <h2 className="section-title text-charcoal">Production</h2>
         <p className="mt-2 body-text">
-          Current stage: <strong>{stageName(job.current_stage_id)}</strong>
+          Current stage: <strong>{job.current_stage_id ? stageName(job.current_stage_id) : "Not started"}</strong>
         </p>
-        <p className="mt-1 meta-text">
-          Workflow: {stages.filter((stage) => stage.is_active).map((stage) => stage.name).join(" → ") || "None configured"}
-        </p>
+        <ol className="mt-3 flex flex-wrap gap-2">
+          {activeStages(stages).map((stage, index, workflow) => {
+            const currentIndex = workflow.findIndex((item) => item.id === job.current_stage_id);
+            const current = stage.id === job.current_stage_id;
+            const done = currentIndex >= 0 && index < currentIndex;
+            return (
+              <li
+                key={stage.id}
+                className={`rounded-full px-3 py-1 text-sm ${
+                  current ? "bg-amber font-medium text-charcoal" : done ? "bg-canvas text-charcoal" : "text-muted"
+                }`}
+              >
+                {index + 1}. {stage.name}
+              </li>
+            );
+          })}
+        </ol>
+        {activeStages(stages).length === 0 ? (
+          <p className="mt-2 meta-text">No steps are configured for this category.</p>
+        ) : null}
         <ol className="mt-4 space-y-3">
           {history.map((entry) => (
             <li key={entry.id} className="border-l-2 border-amber pl-3">

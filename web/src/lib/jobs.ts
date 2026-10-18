@@ -35,6 +35,21 @@ export function specPayload(text: string): Record<string, unknown> {
   return { details: trimmed };
 }
 
+export function activeStages(stages: WorkflowStage[]): WorkflowStage[] {
+  return stages.filter((stage) => stage.is_active).sort((a, b) => a.sequence - b.sequence);
+}
+
+export function adjacentStage(
+  stages: WorkflowStage[],
+  currentId: string | null,
+  direction: -1 | 1,
+): WorkflowStage | null {
+  const active = activeStages(stages);
+  const index = active.findIndex((stage) => stage.id === currentId);
+  if (index < 0) return null;
+  return active[index + direction] ?? null;
+}
+
 export function allowedStageTargets(
   stages: WorkflowStage[],
   currentId: string | null,

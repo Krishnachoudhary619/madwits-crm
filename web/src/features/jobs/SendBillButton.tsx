@@ -39,6 +39,21 @@ function downloadPdf(bytes: Uint8Array, filename: string) {
   URL.revokeObjectURL(url);
 }
 
+export async function deliverBill(
+  job: Job,
+  customer: Customer | null,
+  category: PrintCategory | null,
+  balance: JobBalance | null,
+) {
+  const details = detailsFor(job, customer, category, balance);
+  const bytes = buildBillPdf(details);
+  downloadPdf(bytes, `${job.job_number}-bill.pdf`);
+  const opened = window.open(whatsappShareUrl(details), "_blank", "noopener,noreferrer");
+  if (!opened) {
+    window.location.assign(whatsappShareUrl(details));
+  }
+}
+
 export function SendBillButton({
   job,
   customer,
@@ -56,15 +71,8 @@ export function SendBillButton({
   async function sendBill() {
     setBusy(true);
     setError("");
-    const details = detailsFor(job, customer, category, balance);
-    const bytes = buildBillPdf(details);
-    const filename = `${job.job_number}-bill.pdf`;
     try {
-      downloadPdf(bytes, filename);
-      const opened = window.open(whatsappShareUrl(details), "_blank", "noopener,noreferrer");
-      if (!opened) {
-        window.location.assign(whatsappShareUrl(details));
-      }
+      await deliverBill(job, customer, category, balance);
     } catch (err) {
       if ((err as Error).name === "AbortError") return;
       setError(errorMessage(err));

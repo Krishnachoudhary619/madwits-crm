@@ -6,19 +6,25 @@ import { shopDateTime } from "@/lib/dates";
 import { errorMessage } from "@/lib/errors";
 import { formatInr } from "@/lib/money";
 import { canCancel, canChangeStage, canConfirm, canMarkLost, canQuote } from "@/lib/lifecycle";
-import { allowedStageTargets } from "@/lib/jobs";
+import { adjacentStage } from "@/lib/jobs";
 import type { Job, WorkflowStage } from "@/types/api";
 import { AttributionSelect } from "@/features/jobs/AttributionSelect";
-import { Button, ErrorBanner, Field, Input, Modal, Select, Textarea } from "@/components/ui";
+import { ActionMenu, Button, ErrorBanner, Field, Input, Modal, Select, Textarea } from "@/components/ui";
 
 export function JobActions({
   job,
   stages,
   onUpdated,
+  onEdit,
+  onRecordPayment,
+  onSendBill,
 }: {
   job: Job;
   stages: WorkflowStage[];
   onUpdated: (job: Job, conflict?: boolean) => void;
+  onEdit: () => void;
+  onRecordPayment?: () => void;
+  onSendBill?: () => void;
 }) {
   const [modal, setModal] = useState<"quote" | "confirm" | "lost" | "cancel" | "stage" | null>(null);
   const [busy, setBusy] = useState(false);
@@ -29,9 +35,11 @@ export function JobActions({
   const [advance, setAdvance] = useState(job.advance_amount ?? "0");
   const [awaiting, setAwaiting] = useState(true);
   const [notes, setNotes] = useState("");
-  const [toStage, setToStage] = useState("");
+  const [stageTarget, setStageTarget] = useState<WorkflowStage | null>(null);
 
-  const targets = allowedStageTargets(stages, job.current_stage_id);
+  const nextStage = canChangeStage(job.lead_status) ? adjacentStage(stages, job.current_stage_id, 1) : null;
+  const previousStage = canChangeStage(job.lead_status) ? adjacentStage(stages, job.current_stage_id, -1) : null;
+  const currentStageName = stages.find((stage) => stage.id === job.current_stage_id)?.name ?? "Current stage";
 
   function open(kind: typeof modal) {
     setError("");
@@ -39,8 +47,12 @@ export function JobActions({
     setQuoted(job.quoted_amount ?? "");
     setFinalAmount(job.final_amount ?? "");
     setAdvance(job.advance_amount ?? "0");
-    setToStage(targets[0]?.id ?? "");
     setModal(kind);
+  }
+
+  function openStage(stage: WorkflowStage) {
+    setStageTarget(stage);
+    open("stage");
   }
 
   async function submit() {
@@ -67,8 +79,12 @@ export function JobActions({
       } else if (modal === "cancel") {
         updated = await jobsApi.cancel(job.id, { notes: notes || null });
       } else if (modal === "stage") {
+        if (!stageTarget) {
+          setError("The next stage is not available.");
+          return;
+        }
         updated = await jobsApi.stage(job.id, {
-          to_stage_id: toStage,
+          to_stage_id: stageTarget.id,
           updated_by_user_id: attribution,
           expected_current_stage_id: job.current_stage_id,
           notes: notes || null,
@@ -87,33 +103,34 @@ export function JobActions({
     }
   }
 
+  const movingBack = stageTarget != null && stageTarget.id === previousStage?.id;
+  const primary = nextStage
+    ? { label: `Next: ${nextStage.name}`, onClick: () => openStage(nextStage) }
+    : canConfirm(job.lead_status)
+      ? { label: "Confirm job", onClick: () => open("confirm") }
+      : canQuote(job.lead_status)
+        ? { label: "Prepare quotation", onClick: () => open("quote") }
+        : null;
+
+  const menuItems = [
+    { label: "Edit job", onSelect: onEdit },
+    onRecordPayment ? { label: "Record payment", onSelect: onRecordPayment } : null,
+    onSendBill ? { label: "Send bill on WhatsApp", onSelect: onSendBill } : null,
+    canQuote(job.lead_status) && primary?.label !== "Prepare quotation"
+      ? { label: "Prepare quotation", onSelect: () => open("quote") }
+      : null,
+    canConfirm(job.lead_status) && primary?.label !== "Confirm job"
+      ? { label: "Confirm job", onSelect: () => open("confirm") }
+      : null,
+    previousStage ? { label: `Move back to ${previousStage.name}`, onSelect: () => openStage(previousStage) } : null,
+    canMarkLost(job.lead_status) ? { label: "Mark lost", danger: true, onSelect: () => open("lost") } : null,
+    canCancel(job.lead_status) ? { label: "Cancel job", danger: true, onSelect: () => open("cancel") } : null,
+  ].filter((item): item is { label: string; onSelect: () => void; danger?: boolean } => item !== null);
+
   return (
     <>
-      <div className="flex flex-wrap gap-2">
-        {canQuote(job.lead_status) ? (
-          <Button onClick={() => open("quote")}>Prepare quotation</Button>
-        ) : null}
-        {canConfirm(job.lead_status) ? (
-          <Button variant="secondary" onClick={() => open("confirm")}>
-            Confirm job
-          </Button>
-        ) : null}
-        {canChangeStage(job.lead_status) ? (
-          <Button variant="secondary" onClick={() => open("stage")}>
-            Change stage
-          </Button>
-        ) : null}
-        {canMarkLost(job.lead_status) ? (
-          <Button variant="secondary" onClick={() => open("lost")}>
-            Mark lost
-          </Button>
-        ) : null}
-        {canCancel(job.lead_status) ? (
-          <Button variant="danger" onClick={() => open("cancel")}>
-            Cancel job
-          </Button>
-        ) : null}
-      </div>
+      {primary ? <Button onClick={primary.onClick}>{primary.label}</Button> : null}
+      <ActionMenu label="Job actions" disabled={busy} items={menuItems} />
       {modal ? (
         <Modal
           title={
@@ -122,7 +139,9 @@ export function JobActions({
               : modal === "confirm"
                 ? "Confirm existing job"
                 : modal === "stage"
-                  ? "Change production stage"
+                  ? movingBack
+                    ? `Move back to ${stageTarget?.name ?? "previous stage"}`
+                    : `Next: ${stageTarget?.name ?? "next stage"}`
                   : modal === "lost"
                     ? "Mark lost"
                     : "Cancel job"
@@ -130,7 +149,7 @@ export function JobActions({
           onClose={() => setModal(null)}
           onSubmit={submit}
           busy={busy}
-          submitLabel="Save"
+          submitLabel={modal === "stage" ? "Update stage" : "Save"}
         >
           {error ? <ErrorBanner message={error} /> : null}
           {modal === "quote" ? (
@@ -162,22 +181,11 @@ export function JobActions({
               <AttributionSelect value={attribution} onChange={setAttribution} />
             </>
           ) : null}
-          {modal === "stage" ? (
+          {modal === "stage" && stageTarget ? (
             <>
-              <Field label="Move to stage">
-                <Select required value={toStage} onChange={(event) => setToStage(event.target.value)}>
-                  <option value="">Select stage</option>
-                  {targets.map((stage) => (
-                    <option key={stage.id} value={stage.id}>
-                      {stage.name}
-                      {stage.is_final ? " (final)" : ""}
-                    </option>
-                  ))}
-                </Select>
-              </Field>
-              {targets.length === 0 ? (
-                <p className="text-sm text-muted">No further stage moves are available from the current workflow.</p>
-              ) : null}
+              <p className="text-sm text-muted">
+                {currentStageName} moves to <span className="font-medium text-charcoal">{stageTarget.name}</span>.
+              </p>
               <AttributionSelect value={attribution} onChange={setAttribution} />
             </>
           ) : null}

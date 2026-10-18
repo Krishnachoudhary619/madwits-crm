@@ -5,7 +5,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { jobsApi } from "@/lib/api/endpoints";
 import { formatDate } from "@/lib/dates";
 import { errorMessage } from "@/lib/errors";
-import { allowedStageTargets, listAllJobs } from "@/lib/jobs";
+import { adjacentStage, listAllJobs } from "@/lib/jobs";
 import { formatInr } from "@/lib/money";
 import type { Job, WorkflowStage } from "@/types/api";
 import { Button, Card, EmptyState, ErrorBanner, Field, Modal, PageHeader, Select, Spinner, Textarea } from "@/components/ui";
@@ -18,11 +18,13 @@ function JobCard({
   job,
   customerName,
   categoryName,
+  moveLabel,
   onMove,
 }: {
   job: Job;
   customerName: string;
   categoryName: string;
+  moveLabel: string | null;
   onMove: (job: Job) => void;
 }) {
   return (
@@ -34,9 +36,11 @@ function JobCard({
       <p className="meta-text">{categoryName}</p>
       <p className="mt-1 meta-text">Due {formatDate(job.due_date)}</p>
       <p className="money body-text font-medium">{formatInr(job.final_amount ?? job.quoted_amount)}</p>
-      <Button className="mt-2 w-full" variant="secondary" onClick={() => onMove(job)}>
-        Change stage
-      </Button>
+      {moveLabel ? (
+        <Button className="mt-2 w-full" variant="secondary" onClick={() => onMove(job)}>
+          {moveLabel}
+        </Button>
+      ) : null}
     </Card>
   );
 }
@@ -108,10 +112,20 @@ export default function ProductionPage() {
     if (!mobileStage && columns[0]) setMobileStage(columns[0].id);
   }, [columns, mobileStage]);
 
+  function moveLabelFor(job: Job) {
+    const list = stagesByCategory[job.category_id] ?? [];
+    const next = adjacentStage(list, job.current_stage_id, 1);
+    if (next) return `Next: ${next.name}`;
+    const previous = adjacentStage(list, job.current_stage_id, -1);
+    return previous ? `Back: ${previous.name}` : null;
+  }
+
   function beginMove(job: Job) {
-    const targets = allowedStageTargets(stagesByCategory[job.category_id] ?? [], job.current_stage_id);
+    const list = stagesByCategory[job.category_id] ?? [];
+    const target = adjacentStage(list, job.current_stage_id, 1) ?? adjacentStage(list, job.current_stage_id, -1);
+    if (!target) return;
     setMoving(job);
-    setToStage(targets[0]?.id ?? "");
+    setToStage(target.id);
     setNotes("");
     setError("");
   }
@@ -218,6 +232,7 @@ export default function ProductionPage() {
                   job={job}
                   customerName={nameById(customers, job.customer_id)}
                   categoryName={nameById(categories, job.category_id)}
+                  moveLabel={moveLabelFor(job)}
                   onMove={beginMove}
                 />
               ))}
@@ -239,6 +254,7 @@ export default function ProductionPage() {
                       job={job}
                       customerName={nameById(customers, job.customer_id)}
                       categoryName={nameById(categories, job.category_id)}
+                      moveLabel={moveLabelFor(job)}
                       onMove={beginMove}
                     />
                   ))}
@@ -263,6 +279,7 @@ export default function ProductionPage() {
                         job={job}
                         customerName={nameById(customers, job.customer_id)}
                         categoryName={nameById(categories, job.category_id)}
+                        moveLabel={moveLabelFor(job)}
                         onMove={beginMove}
                       />
                     ))}
@@ -283,22 +300,35 @@ export default function ProductionPage() {
         >
           {error ? <ErrorBanner message={error} /> : null}
           <p className="body-text text-muted">
-            Current stage:{" "}
             {nameById(
-              (stagesByCategory[moving.category_id] ?? []).map((s) => ({ id: s.id, name: s.name })),
+              (stagesByCategory[moving.category_id] ?? []).map((stage) => ({ id: stage.id, name: stage.name })),
               moving.current_stage_id,
-            )}
+            )}{" "}
+            moves to{" "}
+            <span className="font-medium text-charcoal">
+              {nameById(
+                (stagesByCategory[moving.category_id] ?? []).map((stage) => ({ id: stage.id, name: stage.name })),
+                toStage,
+              )}
+            </span>
+            .
           </p>
-          <Field label="Next stage">
-            <Select value={toStage} onChange={(event) => setToStage(event.target.value)}>
-              {allowedStageTargets(stagesByCategory[moving.category_id] ?? [], moving.current_stage_id).map((stage) => (
-                <option key={stage.id} value={stage.id}>
-                  {stage.name}
-                  {stage.is_final ? " (final)" : ""}
-                </option>
-              ))}
-            </Select>
-          </Field>
+          {(() => {
+            const list = stagesByCategory[moving.category_id] ?? [];
+            const next = adjacentStage(list, moving.current_stage_id, 1);
+            const previous = adjacentStage(list, moving.current_stage_id, -1);
+            if (!next || !previous || next.id === previous.id) return null;
+            const alternate = toStage === previous.id ? next : previous;
+            return (
+              <button
+                type="button"
+                className="text-sm text-charcoal underline"
+                onClick={() => setToStage(alternate.id)}
+              >
+                {alternate.id === previous.id ? `Move back to ${previous.name} instead` : `Move forward to ${next.name} instead`}
+              </button>
+            );
+          })()}
           <AttributionSelect value={attribution} onChange={setAttribution} />
           <Field label="Notes">
             <Textarea value={notes} onChange={(event) => setNotes(event.target.value)} />

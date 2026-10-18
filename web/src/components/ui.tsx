@@ -8,9 +8,11 @@ import {
   InputHTMLAttributes,
   ButtonHTMLAttributes,
   useEffect,
+  useRef,
   useState,
 } from "react";
 import Link from "next/link";
+import { EllipsisVertical } from "lucide-react";
 import { createPortal } from "react-dom";
 
 export function buttonClass(variant: "primary" | "secondary" | "ghost" | "danger" = "primary") {
@@ -23,6 +25,84 @@ export function buttonClass(variant: "primary" | "secondary" | "ghost" | "danger
     danger: "bg-danger text-white hover:bg-red-800 focus-visible:outline-danger",
   }[variant];
   return `inline-flex min-h-11 items-center justify-center gap-2 rounded-md px-4 py-2 text-sm font-medium transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 disabled:cursor-not-allowed ${styles}`;
+}
+
+export function ActionMenu({
+  label,
+  disabled = false,
+  items,
+}: {
+  label: string;
+  disabled?: boolean;
+  items: { label: string; onSelect: () => void; disabled?: boolean; danger?: boolean }[];
+}) {
+  const rootRef = useRef<HTMLDivElement>(null);
+  const [open, setOpen] = useState(false);
+  const [above, setAbove] = useState(false);
+
+  useEffect(() => {
+    if (!open) return;
+    const rect = rootRef.current?.getBoundingClientRect();
+    setAbove(rect ? window.innerHeight - rect.bottom < 220 : false);
+    function onPointer(event: MouseEvent) {
+      if (!rootRef.current?.contains(event.target as Node)) setOpen(false);
+    }
+    function onKey(event: KeyboardEvent) {
+      if (event.key === "Escape") setOpen(false);
+    }
+    document.addEventListener("mousedown", onPointer);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onPointer);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+
+  if (items.length === 0) return null;
+
+  return (
+    <div className="relative" ref={rootRef}>
+      <button
+        type="button"
+        className="flex min-h-11 min-w-11 items-center justify-center rounded-md text-muted hover:bg-canvas hover:text-charcoal focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-charcoal disabled:cursor-not-allowed disabled:opacity-50"
+        aria-label={label}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        disabled={disabled}
+        onClick={() => setOpen((value) => !value)}
+      >
+        <EllipsisVertical size={18} />
+      </button>
+      {open ? (
+        <div
+          role="menu"
+          className={`absolute right-0 z-20 min-w-44 rounded-lg border border-line bg-white py-1 shadow-[var(--shadow-pop)] ${
+            above ? "bottom-full mb-1" : "top-full mt-1"
+          }`}
+        >
+          {items.map((item) => (
+            <button
+              key={item.label}
+              type="button"
+              role="menuitem"
+              disabled={item.disabled}
+              className={`flex min-h-11 w-full items-center px-3 text-left text-sm disabled:cursor-not-allowed disabled:opacity-40 ${
+                item.danger
+                  ? "border-t border-line text-danger hover:bg-red-50"
+                  : "text-charcoal hover:bg-canvas"
+              }`}
+              onClick={() => {
+                setOpen(false);
+                item.onSelect();
+              }}
+            >
+              {item.label}
+            </button>
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
 }
 
 export function Button({
