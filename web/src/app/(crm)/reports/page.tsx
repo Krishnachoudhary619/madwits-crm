@@ -6,7 +6,7 @@ import { monthStartIsoDate, todayIsoDate } from "@/lib/dates";
 import { errorMessage } from "@/lib/errors";
 import { formatInr } from "@/lib/money";
 import type { DashboardSummary, JobsByCategoryItem, JobsByStageItem, PaymentsSummary } from "@/types/api";
-import { Card, ErrorBanner, Input, PageHeader, Spinner } from "@/components/ui";
+import { Card, ErrorBanner, Field, Input, PageHeader, Spinner } from "@/components/ui";
 
 export default function ReportsPage() {
   const [from, setFrom] = useState(monthStartIsoDate());
@@ -49,16 +49,22 @@ export default function ReportsPage() {
 
   return (
     <div>
-      <PageHeader
-        title="Reports & analytics"
-        description="Figures are the same backend dashboard aggregations used on the home page. Profit, GST, inventory, and staff performance are not available from the API."
-        actions={
-          <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto">
-            <Input type="date" value={from} onChange={(event) => setFrom(event.target.value)} aria-label="From" />
-            <Input type="date" value={to} onChange={(event) => setTo(event.target.value)} aria-label="To" />
-          </div>
-        }
-      />
+      <PageHeader title="Reports & analytics" />
+      <div className="-mt-2 mb-5 grid grid-cols-2 gap-3 sm:max-w-md">
+        <div className="min-w-0">
+          <Field label="From">
+            <Input type="date" className="min-w-0" value={from} onChange={(event) => setFrom(event.target.value)} />
+          </Field>
+        </div>
+        <div className="min-w-0">
+          <Field label="To">
+            <Input type="date" className="min-w-0" value={to} onChange={(event) => setTo(event.target.value)} />
+          </Field>
+        </div>
+      </div>
+      <p className="mb-5 max-w-2xl body-text text-muted">
+        Figures are the same backend dashboard aggregations used on the home page. Profit, GST, inventory, and staff performance are not available from the API.
+      </p>
       {error ? <ErrorBanner message={error} /> : null}
       {loading || !summary ? (
         <Spinner />
