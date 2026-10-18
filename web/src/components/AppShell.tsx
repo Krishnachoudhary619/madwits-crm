@@ -28,7 +28,7 @@ const NAV = [
   { href: "/enquiries", label: "Enquiries & Quotations", icon: ClipboardList },
   { href: "/jobs", label: "Jobs", icon: Printer },
   { href: "/production", label: "Work in progress", icon: Kanban },
-  { href: "/payments", label: "Payments & Outstanding", icon: Banknote },
+  { href: "/payments", label: "Payments", icon: Banknote },
   { href: "/reports", label: "Reports & Analytics", icon: BarChart3 },
   { href: "/categories", label: "Categories & Workflows", icon: Layers },
 ];
